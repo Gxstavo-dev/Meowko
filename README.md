@@ -1,5 +1,9 @@
 <div align="center">
 
+<p align="center">
+  <img src="gato_icon.png" width="100" alt="Gato naranja">
+</p>
+
 # meowko
 
 **Un widget de Wayland para chatear con [opencode](https://opencode.ai), en el panel superior.**
@@ -145,11 +149,11 @@ quickshell -p ~/dotfiles/quickshell/shell.qml
 
 `meowkow.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `StandardPaths.HomeLocation`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
 
-| Línea | Qué es                                              |
-| ----- | --------------------------------------------------- |
-| 77    | `opencodeBin` — binario de opencode                 |
-| 123   | `sidFile.path` — dónde se guarda el `sessionID`     |
-| 280   | `proc.workingDirectory` — el cwd del proceso        |
+| Línea | Qué es                                          |
+| ----- | ----------------------------------------------- |
+| 77    | `opencodeBin` — binario de opencode             |
+| 123   | `sidFile.path` — dónde se guarda el `sessionID` |
+| 280   | `proc.workingDirectory` — el cwd del proceso    |
 
 > **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `homePath + "/.cache/.bun/bin/opencode"` (homePath = `StandardPaths.HomeLocation` sin el scheme `file://`), o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 77 se ajusta al path real, por ejemplo `homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
 
