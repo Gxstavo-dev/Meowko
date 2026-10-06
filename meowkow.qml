@@ -358,7 +358,7 @@ ShellRoot {
             // collapsed widget must never steal focus from other apps.
             // namespace identifies the surface to the compositor.
 
-            WlrLayershell.layer: WlrLayer.Top
+            WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "meowko"
             WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             exclusionMode: ExclusionMode.Ignore
@@ -851,10 +851,10 @@ ShellRoot {
                                 selectedTextColor: "black"
                                 clip: true
 
-                                    // Enter sends and clears. Escape closes the
+                                // Enter sends and clears. Escape closes the
                                 // whole widget from anywhere in the field.
 
-                            onAccepted: {
+                                onAccepted: {
                                     root.send(text);
                                     text = "";
                                 }
