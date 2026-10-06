@@ -123,7 +123,8 @@ sudo pacman -S --needed pipewire-audio sound-theme-freedesktop ttf-inter
 
 ```bash
 git clone https://github.com/TU-USUARIO/meowko.git
-cp meowko/shell.qml meowko/Cat.qml meowko/*.gif ~/.config/quickshell/
+cp meowko/meowkow.qml meowko/Cat.qml meowko/*.gif ~/.config/quickshell/
+mv ~/.config/quickshell/meowkow.qml ~/.config/quickshell/shell.qml   # es tu copia personal
 ```
 
 Quickshell detecta `~/.config/quickshell/shell.qml` como la configuración `default`, así que alcanza con:
@@ -138,17 +139,19 @@ Si lo instalás en otro lado:
 quickshell -p ~/dotfiles/quickshell/shell.qml
 ```
 
+> En el repo, `shell.qml` está en `.gitignore` (es tu copia personal, la que editás a gusto). `meowkow.qml` es la plantilla generalizada que se distribuye: copiala a `shell.qml` y queda lista.
+
 ### Rutas y portabilidad
 
-`shell.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `StandardPaths.HomeLocation`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
+`meowkow.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `StandardPaths.HomeLocation`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
 
 | Línea | Qué es                                              |
 | ----- | --------------------------------------------------- |
-| 56    | `opencodeBin` — binario de opencode                 |
-| 102   | `sidFile.path` — dónde se guarda el `sessionID`     |
-| 259   | `proc.workingDirectory` — el cwd del proceso        |
+| 77    | `opencodeBin` — binario de opencode                 |
+| 123   | `sidFile.path` — dónde se guarda el `sessionID`     |
+| 280   | `proc.workingDirectory` — el cwd del proceso        |
 
-> **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `homePath + "/.cache/.bun/bin/opencode"` (homePath = `StandardPaths.HomeLocation` sin el scheme `file://`), o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 56 se ajusta al path real, por ejemplo `homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
+> **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `homePath + "/.cache/.bun/bin/opencode"` (homePath = `StandardPaths.HomeLocation` sin el scheme `file://`), o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 77 se ajusta al path real, por ejemplo `homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
 
 ---
 

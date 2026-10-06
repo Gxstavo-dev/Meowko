@@ -6,7 +6,14 @@ import Quickshell.Io
 import Quickshell.Wayland
 
 // ============================================================================
-// meowko — a Wayland panel-shell widget that talks to opencode.
+// meowkow — plantilla generalizada de meowko, una widget Wayland/panel-shell
+// que chatea con opencode.
+//
+// Este archivo es la versión portátil: NO trae ningún path hardcodeado y
+// funciona para cualquier usuario. Copialo a tu config y editalo libremente:
+//
+//     cp meowkow.qml shell.qml
+//     quickshell              # o el alias qs
 //
 // Closed: a 44x18 black bar with two blinking eyes, pinned to the top edge of
 // the screen. Click it and it expands into a 600x340 chat bubble.
@@ -50,7 +57,21 @@ ShellRoot {
 
     signal answered
 
-    // Home real del usuario como path plano (sin scheme file://).
+    // ---------------------------------------------------------------------
+    // CONFIGURACIÓN — lo único que podés llegar a tocar al instalarlo
+    // ---------------------------------------------------------------------
+    //
+    // homePath se resuelve solo: es el home del usuario que corre la widget
+    // (vía StandardPaths.HomeLocation, sin el scheme file://). No lo edites.
+    //
+    // opencodeBin asume que opencode se instaló con bun (~/.cache/.bun/bin).
+    // Si lo instalaste por otra vía (npm global, cargo, binario manual),
+    // cambiá este path, p. ej.:
+    //     homePath + "/.local/share/npm-global/bin/opencode"
+    //
+    // El resto de rutas (sidFile, workingDirectory) también deriva de
+    // homePath y no necesita toques.
+
     readonly property string homePath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "")
 
     readonly property string opencodeBin: homePath + "/.cache/.bun/bin/opencode"
