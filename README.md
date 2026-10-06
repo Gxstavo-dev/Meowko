@@ -140,15 +140,15 @@ quickshell -p ~/dotfiles/quickshell/shell.qml
 
 ### Rutas y portabilidad
 
-`shell.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `Qt.homePath`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
+`shell.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `StandardPaths.HomeLocation`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
 
 | Línea | Qué es                                              |
 | ----- | --------------------------------------------------- |
-| 52    | `opencodeBin` — binario de opencode                 |
-| 98    | `sidFile.path` — dónde se guarda el `sessionID`     |
-| 256   | `proc.workingDirectory` — el cwd del proceso        |
+| 56    | `opencodeBin` — binario de opencode                 |
+| 102   | `sidFile.path` — dónde se guarda el `sessionID`     |
+| 259   | `proc.workingDirectory` — el cwd del proceso        |
 
-> **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `Qt.homePath + "/.cache/.bun/bin/opencode"`, o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 52 se ajusta al path real, por ejemplo `Qt.homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
+> **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `homePath + "/.cache/.bun/bin/opencode"` (homePath = `StandardPaths.HomeLocation` sin el scheme `file://`), o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 56 se ajusta al path real, por ejemplo `homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
 
 ---
 
@@ -376,7 +376,7 @@ readonly property string opencodeBin: ".../opencode"
 ```qml
 Process {
     id: proc
-    workingDirectory: Qt.homePath
+    workingDirectory: homePath
     environment: ({ NO_COLOR: "1", TERM: "dumb" })
 
     stdout: StdioCollector {

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtCore
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -49,7 +50,10 @@ ShellRoot {
 
     signal answered
 
-    readonly property string opencodeBin: Qt.homePath + "/.cache/.bun/bin/opencode"
+    // Home real del usuario como path plano (sin scheme file://).
+    readonly property string homePath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "")
+
+    readonly property string opencodeBin: homePath + "/.cache/.bun/bin/opencode"
 
     // ---------------------------------------------------------------------
     // Geometry
@@ -95,7 +99,7 @@ ShellRoot {
 
     FileView {
         id: sidFile
-        path: Qt.homePath + "/.local/state/meowko-session"
+        path: homePath + "/.local/state/meowko-session"
         blockLoading: true
     }
 
@@ -252,7 +256,7 @@ ShellRoot {
 
     Process {
         id: proc
-        workingDirectory: Qt.homePath
+        workingDirectory: homePath
         // NO_COLOR / TERM=dumb keep opencode from emitting terminal escapes
         // into a stream we are about to JSON.parse line by line.
 
