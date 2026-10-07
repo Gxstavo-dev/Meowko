@@ -1,105 +1,133 @@
-<div align="center">
-
 <p align="center">
-  <img src="gato_icon.png" width="100" alt="Gato naranja">
+  <img src="assets/gato_icon.png" alt="Gato naranja" width="120">
 </p>
 
 # meowko
 
 **Un widget de Wayland para chatear con [opencode](https://opencode.ai), en el panel superior.**
 
-Un gatito que duerme cuando opencode está inactivo, se despierta mientras contesta, y te avisa con un parpadeo cuando la respuesta llegó.
-
-</div>
+Un gatito que duerme cuando opencode está inactivo, se despierta mientras contesta y te avisa con un parpadeo cuando la respuesta llegó.
 
 ---
 
 ## Índice
 
 - [Qué hace](#qué-hace)
-- [Demo](#demo)
+- [Comandos](#comandos)
 - [Cómo funciona por dentro](#cómo-funciona-por-dentro)
 - [Requisitos](#requisitos)
 - [Instalación](#instalación)
-- [Autostart en Arch + Hyprland](#autostart-en-arch--hyprland)
-- [Sobre Lua](#sobre-lua)
+- [Autostart](#autostart)
 - [Estructura del proyecto](#estructura-del-proyecto)
-- [Referencia de `shell.qml`](#referencia-de-shellqml)
+- [Referencia de `meowko.qml`](#referencia-de-meowkoqml)
 - [Referencia de `Cat.qml`](#referencia-de-catqml)
 - [Personalización](#personalización)
 - [Problemas conocidos](#problemas-conocidos)
+- [Roadmap](#roadmap)
 - [Licencia](#licencia)
 
 ---
 
 ## Qué hace
 
-Un botón flotante anclado al borde superior de la pantalla. Cerrado es una barrita negra de 44×18 px con dos ojitos que parpadean de vez en cuando, como si esperara. Lo clickeás y se abre una burbuja negra de 600×340 px con la conversación.
+Un botón flotante anclado al borde superior de la pantalla. Cerrado es una barrita negra de 44×18 px con dos ojitos que parpadean de vez en cuando. Al hacer clic se abre una burbuja negra de 600×340 px con la conversación.
 
-Dentro:
+| Acción                                                       | Resultado                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Escribir algo y pulsar `Enter`                               | Se envía a `opencode run` y aparecen tres puntitos parpadeando     |
+| Escribir `/`                                                 | Aparece el autocompletado de [comandos](#comandos); `Tab` completa |
+| Llega la respuesta                                           | Aparece el texto y suena un aviso                                  |
+| Hay respuesta y el widget está cerrado                       | La barrita parpadea de negro a blanco muy despacio                 |
+| Abrir el widget                                              | El foco salta al input y el parpadeo se corta                      |
+| `Esc` dos veces, botón ■ o `/cancel` con una petición activa | Cancela la petición (conserva el texto que hubiera llegado)        |
+| `Esc` sin petición activa                                    | Cierra el widget                                                   |
+| Clic en el modelo del encabezado                             | Lista los modelos disponibles (igual que `/models`)                |
+| Clic en el ícono de volumen                                  | Silencia el aviso (no afecta el parpadeo)                          |
+| Clic en el ícono de copiar                                   | Copia la respuesta al portapapeles y muestra un ✓ durante 1,2 s    |
+| Clic en "nuevo"                                              | Borra la conversación y la sesión guardada                         |
 
-| Acción                                 | Resultado                                                      |
-| -------------------------------------- | -------------------------------------------------------------- |
-| Escribís algo y dá `Enter`             | Se envía a `opencode run` y aparecen tres puntitos parpadeando |
-| Llega la respuesta                     | El texto aparece, suena un aviso, y el input se limpia         |
-| Hay respuesta y el widget está cerrado | La barrita parpadea de negro a blanco muy despacio             |
-| Abrís el widget                        | El foco salta solo al input y el parpadeo se corta             |
-| Click en el ícono de volumen           | Silencia el aviso (no afecta el parpadeo)                      |
-| Click en el ícono de copiar            | Copia la respuesta al portapapeles y muestra un ✓ por 1,2 s    |
-| Click en "nuevo"                       | Borra la conversación y la sesión guardada                     |
-| `Escape`                               | Cierra el widget                                               |
+El gato junto al input indica el estado: **dormido** si opencode no hace nada, **tranquilo** si está trabajando.
 
-El gato junto al input indica el estado de opencode: **dormido** si no está haciendo nada, **tranquilo** si está trabajando. Es el mismo estado que alimenta los puntitos de "pensando".
+El encabezado muestra el ID de la sesión y el modelo/agente activos. Modelo, agente y directorio de trabajo se guardan entre reinicios.
 
 ### Dos detalles de diseño
 
-**La capa.** Usa `wlr-layer-shell` en `WlrLayer.Top` con `exclusionMode: Ignore`, así que flotan sobre todo sin reservar espacio en la barra del compositor. El `mask: Region { item: box }` recorta la superficie invisible, para que el clicks que no están sobre el widget no se intercepten.
+**La capa.** Usa `wlr-layer-shell` en `WlrLayer.Overlay` con `exclusionMode: Ignore`: flota sobre todo sin reservar espacio en la barra del compositor. El `mask: Region { item: box }` recorta la superficie invisible para que los clics fuera del widget no se intercepten.
 
-**El parpadeo de alerta.** No alterna entre blanco y negro de golpe: interpola. `flash` sube y baja con `Easing.InOutSine` y el color del fondo se calcula mezclando `cBg` hacia blanco según ese valor. Los ojitos invierten a negro con la misma variable, porque si no desaparecerían sobre el fondo blanco. El ciclo completo dura 8 s: 2,6 s de fundido, 1,4 s de pausa, 2,6 s de vuelta, 1,4 s de pausa.
+**El parpadeo de alerta.** No alterna entre blanco y negro de golpe: interpola. `flash` sube y baja con `Easing.InOutSine` y el color de fondo se calcula mezclando `cBg` hacia blanco según ese valor. Los ojitos se invierten a negro con la misma variable; si no, desaparecerían sobre el fondo blanco. El ciclo dura 8 s: 2,6 s de fundido, 1,4 s de pausa, 2,6 s de vuelta y 1,4 s de pausa.
+
+---
+
+## Comandos
+
+Los mensajes que empiezan con `/` los resuelve el widget y **no** se envían a opencode.
+
+| Comando                     | Qué hace                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `/help`                     | Lista los comandos                                                           |
+| `/model`                    | Muestra el modelo activo                                                     |
+| `/model <proveedor/modelo>` | Cambia el modelo. Acepta un fragmento si solo coincide uno (`/model sonnet`) |
+| `/model default`            | Vuelve al modelo por defecto de opencode                                     |
+| `/models [filtro]`          | Lista los modelos disponibles (`opencode models`), con filtro opcional       |
+| `/agent [nombre]`           | Muestra o cambia el agente (`/agent plan`); `/agent default` lo quita        |
+| `/agents`                   | Lista los agentes (`opencode agent list`)                                    |
+| `/sessions`                 | Lista las sesiones (`opencode session list`)                                 |
+| `/session <id>`             | Continúa una sesión por ID                                                   |
+| `/new` o `/clear`           | Nueva conversación                                                           |
+| `/cd <ruta>`                | Cambia el directorio de trabajo de opencode (inicia una conversación nueva)  |
+| `/cancel`                   | Cancela la petición en curso                                                 |
+| `/mute`                     | Silencia o reactiva el aviso sonoro                                          |
+
+El modelo y el agente se pasan a opencode con `--model` y `--agent` en cada petición. Las sesiones pertenecen a un directorio, por eso `/cd` abre una conversación nueva.
 
 ---
 
 ## Cómo funciona por dentro
 
-No hay servidor, ni TUI, ni terminal oculta. El widget habla directo con el binario de opencode por JSON.
+No hay servidor, ni TUI, ni terminal oculta. El widget lanza el binario de opencode y lee su salida JSON.
 
 ```
 ┌─ shell.qml (ShellRoot) ──────────────────────────────────┐
-│                                                         │
-│  Process { id: proc }                                   │
-│    └─ sh -c 'exec opencode run --format json ...'       │
+│                                                          │
+│  Process { id: proc }                                    │
+│    └─ sh -c 'exec opencode run --format json ...'        │
 │         └─ stdout ─► StdioCollector ─► handleOutput()    │
-│              └─ parsea cada línea JSON                  │
-│                   ├─ sessionID ─► FileView (a disco)    │
+│              └─ parsea cada línea JSON                   │
+│                   ├─ sessionID ─► FileView (a disco)     │
 │                   └─ type:"text" ─► ListModel chat       │
-│                                                         │
-│  Process { id: bell }  ─► pw-play complete.oga           │
-│                                                         │
-│  Variants { model: Quickshell.screens }                 │
-│    └─ PanelWindow (una por monitor)                     │
+│                                                          │
+│  Process { id: lister } ─► opencode models / agent list  │
+│  Process { id: bell }   ─► pw-play complete.oga          │
+│                                                          │
+│  Variants { model: Quickshell.screens }                  │
+│    └─ PanelWindow (una por monitor)                      │
 │         └─ Rectangle { id: box }  ← el rectángulo animado│
-│              ├─ ojos       (solo cerrado)                │
-│              ├─ ColumnLayout (header + ListView + input) │
-│              └─ Cat       (dentro del input)            │
-└─────────────────────────────────────────────────────────┘
+│              ├─ ojos          (solo cerrado)             │
+│              ├─ ColumnLayout  (header + ListView + input)│
+│              └─ popup de comandos                        │
+└──────────────────────────────────────────────────────────┘
 ```
 
-**El puente con opencode.** `opencode run --format json` emite una línea JSON por evento. `handleOutput()` las filtra con `startsWith("{")`, las parsea, saca el `sessionID` (either del evento o de `part.sessionID`) y concatena todos los `type === "text"` en un string.
+**El puente con opencode.** `opencode run --format json` emite una línea JSON por evento. `handleOutput()` descarta las que no empiezan con `{`, parsea el resto, extrae el `sessionID` (del evento o de `part.sessionID`) y concatena todos los `type === "text"`.
 
-**La persistencia de sesión.** Un `FileView` en `~/.local/state/meowko-session` guarda el `sessionID`. Al arrancar, `Component.onCompleted` lo lee con `try/catch`, y con `--session "$2"` opencode retoma la conversación anterior. Si el archivo está corrupto, cae a `""` y arranca una sesión nueva.
+**Cómo se lanza.** El comando va envuelto en `sh -c` y los argumentos viajan como parámetros posicionales (`"$0"`, `"$@"`), nunca interpolados. Un mensaje con comillas, backticks o `$` no rompe la shell. El binario se busca con `command -v opencode` y solo si no está en el `PATH` se usa `opencodeBin` como respaldo. El `exec` hace que el PID del proceso sea el de opencode, de modo que la señal de cancelación le llega directo.
 
-**Por qué `StdioCollector`.** El `onStreamFinished` de `StdioCollector` espera a que el proceso termine, así que **no hay streaming**: la respuesta completa aparece de golpe. Ver [Problemas conocidos](#problemas-conocidos).
+**Cancelar.** El primer `Esc` con una petición en curso arma la cancelación (con un aviso junto al input) y un segundo `Esc` en menos de 1,5 s la ejecuta; el botón ■ y `/cancel` cancelan de inmediato. `cancel()` envía `SIGINT` (como `Ctrl+C`). Si el proceso sigue vivo 2 s después, se escala a `SIGTERM`. El texto que hubiera llegado se conserva y se marca como _(cancelado)_, sin sonido ni parpadeo.
 
-**La geometría.** `progress` es un `real` de 0 a 1 con `Behavior` de 220 ms. Todas las medidas del box se interpolan con él:
+**Persistencia.** Dos `FileView` en `~/.local/state/`: `meowko-session` guarda el `sessionID` y `meowko-prefs` guarda modelo, agente y directorio (JSON). Al arrancar se leen con `try/catch`; si faltan o están corruptos, se parte de cero.
 
-```qml
+**Por qué `StdioCollector`.** Espera a que el proceso termine, así que la respuesta aparece de golpe. Ver [Problemas conocidos](#problemas-conocidos).
+
+**La geometría.** `progress` es un `real` de 0 a 1 con un `Behavior` de 220 ms. Todas las medidas del box se interpolan con él:
+
+```
 width:  root.closedW + (root.openW - root.closedW) * win.progress
 height: root.closedH + (root.openH - root.closedH) * win.progress
 ```
 
-Los ojos usan `opacity: Math.max(0, 1 - win.progress * 3)`, o sea desaparecen al 33% de la apertura. El contenido aparece más tarde, con `Math.max(0, (win.progress - 0.6) / 0.4)`: recién se ve del 60% al 100%, que es cuando el box ya tiene el tamaño final y no se nota el reescalado.
+Los ojos desaparecen al 33 % de la apertura (`Math.max(0, 1 - win.progress * 3)`). El contenido aparece recién entre el 60 % y el 100 % (`Math.max(0, (win.progress - 0.6) / 0.4)`), cuando el box ya casi tiene su tamaño final y no se nota el reescalado.
 
-**Un widget por monitor.** `Variants` crea una `PanelWindow` por pantalla, todas superpuestas. Solo la que cumple `activeScreen === modelData.name` tiene `open: true`. El resto quedan cerradas mostrando los ojos. `mask: Region` recorta cada una.
+**Un widget por monitor.** `Variants` crea una `PanelWindow` por pantalla. Solo la que cumple `activeScreen === modelData.name` está abierta; las demás muestran los ojos.
 
 ---
 
@@ -109,109 +137,92 @@ Los ojos usan `opacity: Math.max(0, 1 - win.progress * 3)`, o sea desaparecen al
 | ------------------------- | -------------------------- | ---------------------------------------------------- |
 | Quickshell 0.3+           | el shell                   | `quickshell`                                         |
 | `wlr-layer-shell`         | la capa flotante           | tu compositor (Hyprland, Sway, river, niri, wayfire) |
-| `opencode`                | el backend                 | [docs de instalación](https://opencode.ai)           |
+| `opencode`                | el backend                 | [instalación](https://opencode.ai)                   |
 | PipeWire                  | `pw-play` para el aviso    | `pipewire-audio`                                     |
 | `sound-theme-freedesktop` | el archivo `complete.oga`  | `sound-theme-freedesktop`                            |
 | Inter                     | la tipografía              | `ttf-inter`                                          |
 | Nerd Font                 | íconos de volumen y copiar | `ttf-jetbrains-mono-nerd`                            |
 
-```bash
-sudo pacman -S --needed pipewire-audio sound-theme-freedesktop ttf-inter
+```sh
+sudo pacman -S --needed pipewire-audio sound-theme-freedesktop ttf-inter ttf-jetbrains-mono-nerd
 ```
 
-> **La Nerd Font es necesaria.** Los íconos se referencian por code point Unicode (`\uF028` volumen, `\uF026` mute, `\uF0C5` copiar, `\uF00C` check). Sin una fuente que los tenga, no se dibuja nada y no sale ningún error. Si no querés depender de eso, en `shell.qml` cambiá `font.family: "JetBrainsMono Nerd Font"` por texto normal: `🔇`/`🔊` y `✓`/`⧉`.
+> **La Nerd Font es necesaria.** Los íconos se referencian por code point Unicode (`\uF028` volumen, `\uF026` mute, `\uF0C5` copiar, `\uF00C` check). Sin una fuente que los incluya no se dibuja nada y no aparece ningún error. Para no depender de ella, cambia `font.family: "JetBrainsMono Nerd Font"` por texto normal (`🔇`/`🔊`, `✓`/`⧉`).
 
 ---
 
 ## Instalación
 
-```bash
-git clone https://github.com/TU-USUARIO/meowko.git
-cp meowko/meowkow.qml meowko/Cat.qml meowko/*.gif ~/.config/quickshell/
-mv ~/.config/quickshell/meowkow.qml ~/.config/quickshell/shell.qml   # es tu copia personal
-```
-
-Quickshell detecta `~/.config/quickshell/shell.qml` como la configuración `default`, así que alcanza con:
-
-```bash
+```sh
+git clone https://github.com/Gxstavo-dev/Meowko.git
+cd Meowko
+mkdir -p ~/.config/quickshell
+cp -r meowko.qml components assets ~/.config/quickshell/
+mv ~/.config/quickshell/meowko.qml ~/.config/quickshell/shell.qml
 quickshell          # o el alias qs
 ```
 
-Si lo instalás en otro lado:
+Quickshell toma `~/.config/quickshell/shell.qml` como la configuración `default`. Si la instalas en otro lugar:
 
-```bash
-quickshell -p ~/dotfiles/quickshell/shell.qml
+```sh
+quickshell -p /ruta/a/shell.qml
 ```
 
-> En el repo, `shell.qml` está en `.gitignore` (es tu copia personal, la que editás a gusto). `meowkow.qml` es la plantilla generalizada que se distribuye: copiala a `shell.qml` y queda lista.
+`Cat.qml` vive en `components/` y los GIFs en `assets/`. Las rutas de `source` son relativas al `.qml` que las usa: desde `components/Cat.qml` apuntan a `../assets/...`, de modo que la carpeta completa se puede copiar tal cual.
+
+> `shell.qml` está en `.gitignore` a propósito: es tu copia de trabajo. `meowko.qml` es la plantilla que se distribuye.
 
 ### Rutas y portabilidad
 
-`meowkow.qml` **no trae rutas hardcodeadas**: todo se resuelve en runtime con `StandardPaths.HomeLocation`, que devuelve el home del usuario que ejecuta el widget. Funcionan igual para vos, para el binario que lo corra o para cualquiera que clone el repo:
+`meowko.qml` no trae rutas de usuario. Todo se resuelve en tiempo de ejecución con `StandardPaths.HomeLocation`:
 
-| Línea | Qué es                                          |
-| ----- | ----------------------------------------------- |
-| 77    | `opencodeBin` — binario de opencode             |
-| 123   | `sidFile.path` — dónde se guarda el `sessionID` |
-| 280   | `proc.workingDirectory` — el cwd del proceso    |
+| Propiedad        | Qué es                                                                      |
+| ---------------- | --------------------------------------------------------------------------- |
+| `sidFile.path`   | dónde se guarda el `sessionID`                                              |
+| `prefsFile.path` | dónde se guardan modelo, agente y directorio                                |
+| `workDir`        | directorio de trabajo de opencode (por defecto el home; cámbialo con `/cd`) |
 
-> **Única asunción externa: dónde vive opencode.** `opencodeBin` apunta a `homePath + "/.cache/.bun/bin/opencode"` (homePath = `StandardPaths.HomeLocation` sin el scheme `file://`), o sea, asume que opencode se instaló con **bun** (instalación por defecto recomendada en [opencode.ai](https://opencode.ai)). Si lo instalaste por otra vía (npm global, cargo, binario manual, etc.) la línea 77 se ajusta al path real, por ejemplo `homePath + "/.local/share/npm-global/bin/opencode"` o una ruta literal. Es solo texto — quickshell le pasa la ruta a `sh -c` tal cual.
+**Dónde está opencode.** El widget ejecuta `command -v opencode` antes de cada comando, así que funciona con cualquier instalación que deje `opencode` en el `PATH`. `opencodeBin` es solo un respaldo para cuando Quickshell arranca con un `PATH` corto (típico al lanzarlo desde el autostart del compositor); por defecto apunta a `~/.cache/.bun/bin/opencode`. Si tu instalación está en otro lado, ajusta esa propiedad:
+
+```qml
+readonly property string opencodeBin: homePath + "/.local/share/npm-global/bin/opencode"
+```
 
 ---
 
-## Autostart en Arch + Hyprland
+## Autostart
 
-Tu setup usa `hyprland.lua` (Hyprland 0.55+ escribe la config en Lua), así que el
-widget se lanza desde tu propio módulo de autostart.
+Elige **una** opción. No las combines: se pisan.
 
-### Opción A — tu `modules/autostart.lua` (la que usás)
+### Hyprland (config clásica)
 
-En `~/.config/hypr/modules/autostart.lua`, dentro del callback `hyprland.start`:
+En `~/.config/hypr/hyprland.conf`:
+
+```ini
+exec-once = pkill -x quickshell; sleep 0.3; quickshell
+```
+
+### Hyprland (config en Lua)
+
+Hyprland 0.55+ permite escribir la configuración en Lua. En tu archivo de autostart, dentro del callback `hyprland.start`:
 
 ```lua
----@diagnostic disable: undefined-global
-
 hl.on("hyprland.start", function()
-    -- ... tus otros exec_cmd ...
-
-    -- meowko: widget de chat para opencode.
-    -- pkill primero evita duplicados si Hyprland recarga la config; el
-    -- `sleep` le da tiempo a que el proceso viejo muera antes de arrancar.
-    hl.exec_cmd("pkill -x quickshell 2>/dev/null; sleep 0.3; quickshell -p $HOME/.config/quickshell/shell.qml &")
+    -- pkill evita duplicados si Hyprland recarga la config;
+    -- el sleep le da tiempo al proceso viejo para morir.
+    hl.exec_cmd("pkill -x quickshell 2>/dev/null; sleep 0.3; quickshell &")
 end)
 ```
 
-Tres detalles de esa línea:
+`hyprctl reload` **no** reinicia el widget: `hyprland.start` se dispara una sola vez, al arrancar Hyprland. Para reiniciarlo a mano:
 
-| Parte                 | Por qué                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------- |
-| `pkill -x quickshell` | Si ya había una instancia, la mata antes de crear otra                                      |
-| `sleep 0.3`           | Le da tiempo al proceso viejo a morir, si no queda huérfano                                 |
-| `&` al final          | `hl.exec_cmd` no bloquea; sin el `&` igual funciona, pero el `pkill`+yaml se encadenan raro |
-
-**`hyprctl reload` no lo reinicia.** El evento `hyprland.start` se dispara una sola vez,
-al arrancar Hyprland. Un reload solo vuelve a leer la config, así que para reiniciar el
-widget a mano:
-
-```bash
-hyprctl eval 'hl.exec_cmd("quickshell -p ~/.config/quickshell/shell.qml &")'
+```sh
+hyprctl eval 'hl.exec_cmd("quickshell &")'
 ```
 
-Verificá que quedó una sola instancia:
+### Servicio systemd de usuario
 
-```bash
-pgrep -a -x quickshell      # debe listar una sola línea
-hyprctl layers | grep meowko   # una capa por monitor
-```
-
-### Opción B — servicio systemd de usuario
-
-Alternativa si preferís el widget atado al ciclo de vida de la sesión y con
-reinicio automático ante crash. **No combines las dos**, se pisan.
-
-```bash
-mkdir -p ~/.config/systemd/user
-```
+Útil si quieres atarlo al ciclo de vida de la sesión, con reinicio automático ante un crash.
 
 `~/.config/systemd/user/quickshell.service`:
 
@@ -223,7 +234,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/quickshell -p %h/.config/quickshell/shell.qml
+ExecStart=/usr/bin/quickshell
 Restart=on-failure
 RestartSec=2
 
@@ -231,159 +242,105 @@ RestartSec=2
 WantedBy=graphical-session.target
 ```
 
-```bash
+```sh
 systemctl --user daemon-reload
 systemctl --user enable --now quickshell.service
-systemctl --user status quickshell.service
 journalctl --user -u quickshell.service -f
 ```
 
-`%h` lo expande systemd a tu HOME, así el unit no depende de tu username.
+### Otros compositores
 
-### Opción C — `.desktop` en autostart
+Con un `.desktop` en `~/.config/autostart/`:
 
-Para cuando usés un compositor sin Hyprland:
-
-```bash
-mkdir -p ~/.config/autostart
-cat > ~/.config/autostart/quickshell.desktop <<'EOF'
+```ini
 [Desktop Entry]
 Type=Application
 Name=meowko
-Exec=/usr/bin/quickshell -p %h/.config/quickshell/shell.qml
+Exec=/usr/bin/quickshell
 Terminal=false
-X-GNOME-Autostart-enabled=true
-EOF
 ```
 
-### Nota sobre Hyprland 0.55+ y la sintaxis de dispatch
+### Verificar
 
-Si en algún momento querés dispararlo desde un keybind, la sintaxis de `dispatch` cambió.
-La forma vieja da error:
-
+```sh
+pgrep -a -x quickshell         # debe listar una sola línea
+hyprctl layers | grep meowko   # una capa por monitor (solo Hyprland)
 ```
-$ hyprctl dispatch exec "quickshell -p ~/... &"
-error: ')' expected near 'pkill'
-```
-
-Usá `hl.exec_cmd` dentro de `hyprctl eval`:
-
-```bash
-hyprctl eval 'hl.exec_cmd("quickshell -p ~/.config/quickshell/shell.qml &")'
-```
-
-Y en un keybind de `hyprland.lua`:
-
-```lua
-hl.bind("SUPER + Q", function()
-  hl.exec_cmd("quickshell -p $HOME/.config/quickshell/shell.qml &")
-end)
-```
-
-### Nota sobre Hyprland y `wlr-layer-shell`
-
-Hyprland implementa `wlr-layer-shell`, así que `WlrLayershell.layer` y
-`exclusionMode` funcionan sin configuración extra. El widget queda en la capa
-overlay: flota sobre todo y no reserva espacio en la barra.
-
-Para confirmar que está mapeado:
-
-```bash
-hyprctl layers | grep meowko
-# Layer 5601...: xywh: 383 0 600 340, namespace: meowko, pid: ...
-```
-
-Una capa por monitor, todas con el namespace `meowko`.
 
 ---
-
-## Sobre Lua
-
-Hay **dos Lua distintos** en juego y conviene no confundirlos:
-
-|                       | Qué es                                                     | Dónde                                  |
-| --------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| **Hyprland en Lua**   | La config del compositor, `hyprland.lua` + `modules/*.lua` | `~/.config/hypr/`                      |
-| **Quickshell en Lua** | Variante de Quickshell escrita en Lua, QML reducido        | build aparte, no es el paquete de Arch |
-
-**Este repo es QML.** Solo usa el primer Lua, y únicamente para lanzar el widget.
-El widget en sí (`shell.qml`, `Cat.qml`) sigue siendo QML, que es lo que entiende
-el `/usr/bin/quickshell` del paquete de Arch:
-
-```
-$ ldd /usr/bin/quickshell | grep -c lua
-0
-```
-
-No hay interpreter de Lua embebido. La variante Lua de Quickshell se compila aparte
-desde el repo de upstream y produce otro binario. Si algún día la querés, el trabajo
-no es un find-and-replace:
-
-| Concepto    | QML (esto)                     | Variante Lua            |
-| ----------- | ------------------------------ | ----------------------- |
-| Layout      | `RowLayout` / `ColumnLayout`   | igual, es el mismo QML  |
-| Propiedades | `property bool unread`         | campos de `QsObject`    |
-| Animaciones | `SequentialAnimation` en línea | `Quickshell.animations` |
-| Procesos    | `Process { id: proc }`         | `Process` con `run()`   |
-| Eventos     | `onClicked:`                   | `on_clicked()`          |
-
-Como el árbol de widgets (`Rectangle`, `Text`, `ListView`, `AnimatedImage`) **es el
-mismo QML** en ambas variantes, la parte visual se porta casi tal cual. Lo que cambia
-es el andamiaje: declaración de propiedades, bindings, y el sistema de animaciones.
-
-Mientras tanto, `quickshell reload` sobre el QML actual funciona y es instantáneo.
 
 ## Estructura del proyecto
 
 ```
-meowko/
+Meowko/
 ├── README.md
-├── LICENSE             # MIT © 2026 Gxstavo-dev
-├── shell.qml            # 857 líneas — ventana, layout, lógica, clipboard
-├── Cat.qml              #  61 líneas — el gato
-├── gato_dormido.gif     # 145×125, 28 frames, 77 KB — opencode inactivo
-├── gato_tranquilo.gif   # 150×140, 34 frames, 89 KB — opencode trabajando
-└── demo.gif             # (opcional) la captura para este README
+├── LICENSE                      # MIT © 2026 Gxstavo-dev
+├── meowko.qml                   # plantilla: ShellRoot, estado, lógica, box animado
+├── assets/
+│   ├── gato_dormido.gif         # 145×125, 28 frames — opencode inactivo
+│   ├── gato_tranquilo.gif       # 150×140, 34 frames — opencode trabajando
+│   └── gato_icon.png            # ícono del README
+├── components/
+│   ├── Cat.qml                  # el gato (lee los GIFs de ../assets/)
+│   ├── Eyes.qml                 # ojitos + parpadeo (solo mientras está cerrado)
+│   ├── Header.qml               # sesión, "nuevo", volumen, cerrar
+│   ├── MessageList.qml          # el ListView y el Connections a answered
+│   ├── UserBubble.qml           # burbuja del mensaje del usuario
+│   ├── AiMessage.qml            # respuesta markdown + botón de copiar
+│   ├── ThinkingDots.qml         # los puntitos al "pensar"
+│   └── InputBar.qml             # gato + campo de texto + placeholder
+└── .gitignore                   # ignora shell.qml (tu copia de trabajo)
 ```
 
-Los dos GIFs son pixel art con proporciones distintas, y el alto de `Cat.qml` sale de la del tranquilo (`150:140`). `fillMode: PreserveAspectFit` hace que el que no coincide se ajuste con un margen chico, invisible a 26 px.
+Los dos GIFs son pixel art con proporciones distintas. El alto de `Cat.qml` sale de la del tranquilo (`150:140`); `fillMode: PreserveAspectFit` ajusta el otro con un margen que a 26 px no se nota.
 
 ---
 
-## Referencia de `shell.qml`
+## Referencia de `meowko.qml`
 
-Todo el código está comentado en inglés. Los comentarios explican el _porqué_, no el _qué_: por ejemplo por qué el comando va envuelto en `sh -c`, por qué el blink interpola el color en vez de alternarlo, o por qué `keyboardFocus` es condicional.
+Los comentarios del código están en inglés y explican el _porqué_, no el _qué_.
 
-### Estado de root
+### Estado de `root`
 
 ```qml
-property string activeScreen: ""                              // nombre del monitor abierto
-property string sessionId: ""                                 // sesión actual de opencode
-property bool muted: false                                    // silence el aviso
-property bool unread: false                                   // respuesta sin leer
-readonly property string soundFile: ".../complete.oga"
-readonly property string opencodeBin: ".../opencode"
+property string activeScreen: ""   // nombre del monitor abierto
+property string sessionId: ""      // sesión actual de opencode
+property string model: ""          // "" = el de opencode
+property string agent: ""          // "" = el de opencode
+property string workDir: homePath  // cwd de opencode
+property bool cancelled: false     // la petición en curso fue cancelada
+property int pendingIndex: -1      // fila del placeholder de la IA
+property bool muted: false
+property bool unread: false        // respuesta sin leer
 ```
 
-`unread` es lo que dispara el parpadeo. Se pone en `true` en `handleOutput()` **solo si** `activeScreen === ""`, o sea que si tenés el widget abierto no parpadea. Se limpia en `onOpenChanged` al abrir.
+`unread` dispara el parpadeo. Se activa en `handleOutput()` **solo si** el widget está cerrado y se limpia en `onOpenChanged` al abrirlo.
+
+`pendingIndex` guarda qué fila del modelo espera la respuesta. Hace falta porque los comandos pueden añadir filas mientras opencode trabaja, y "la última fila" dejaría de ser el placeholder.
 
 ### Funciones
 
-| Función             | Qué hace                                                                                      |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `clean(s)`          | Saca los códigos ANSI y filtra las líneas del borde del TUI (`> … ·`)                         |
-| `setLast(s)`        | Escribe en la última fila del `ListModel` (el placeholder de la IA)                           |
-| `handleOutput(raw)` | Parsea el JSON, guarda la sesión, acumula el texto, dispara `answered()`, `ding()` y `unread` |
-| `send(t)`           | Agrega los dos mensajes al modelo y arma el comando                                           |
-| `newChat()`         | Limpia el modelo, la sesión y el archivo (aborta si `proc.running`)                           |
-| `ding()`            | Reproduce el sonido, salvo que esté muteado                                                   |
+| Función                         | Qué hace                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `clean(s)`                      | Quita códigos ANSI y las líneas de borde del TUI (`> … ·`)                                     |
+| `setLast(s)`                    | Escribe en la fila `pendingIndex` del `ListModel`                                              |
+| `sys(s)`                        | Añade una fila de aviso (salida de un comando)                                                 |
+| `ocCommand(args)`               | Arma la invocación de opencode con `sh -c` y `command -v`                                      |
+| `send(t)`                       | Añade los dos mensajes, arma los flags (`--model`, `--agent`, `--session`) y lanza             |
+| `cancel()`                      | `SIGINT` al proceso; `SIGTERM` a los 2 s si sigue vivo                                         |
+| `runCommand(line)`              | Resuelve un comando `/…`                                                                       |
+| `list(...)` / `handleList(raw)` | Ejecuta `opencode models`, `agent list` o `session list` y muestra el resultado                |
+| `handleOutput(raw)`             | Parsea el JSON, guarda la sesión, acumula el texto y dispara `answered()`, `ding()` y `unread` |
+| `newChat()`                     | Limpia el modelo, la sesión y el archivo (avisa si hay una petición en curso)                  |
+| `savePrefs()`                   | Guarda modelo, agente y directorio                                                             |
+| `ding()`                        | Reproduce el sonido, salvo que esté silenciado                                                 |
 
-### Los dos procesos
+### Los procesos
 
 ```qml
 Process {
     id: proc
-    workingDirectory: homePath
+    workingDirectory: root.workDir
     environment: ({ NO_COLOR: "1", TERM: "dumb" })
 
     stdout: StdioCollector {
@@ -393,25 +350,23 @@ Process {
 }
 ```
 
-`TERM: "dumb"` y `NO_COLOR` evitan que opencode emita secuencias de terminal. El comando va envuelto en `sh -c` con `"$0"`, `"$1"`, `"$2"` en vez de interpolar strings: así un mensaje con comillas o `$` no rompe la shell.
-
-`bell` es un `Process` vacío al que solo se le asigna `command` y `running` al sonar. Al ser independiente, el aviso no bloquea el proceso de opencode.
+`TERM: "dumb"` y `NO_COLOR` evitan que opencode emita secuencias de terminal. `lister` ejecuta los subcomandos de listado y `bell` reproduce el aviso; ambos son independientes de `proc`, así que nada bloquea la petición.
 
 ### `PanelWindow`
 
 ```qml
-WlrLayershell.layer: WlrLayer.Top
+WlrLayershell.layer: WlrLayer.Overlay
 WlrLayershell.namespace: "meowko"
-WlrKeyboardFocus.OnDemand: solo cuando está abierto
+WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 exclusionMode: ExclusionMode.Ignore
 mask: Region { item: box }
 ```
 
-`keyboardFocus` es condicional a propósito: con el widget cerrado el layer no debería robar foco de otras apps.
+`keyboardFocus` es condicional a propósito: con el widget cerrado no debe robar foco a otras aplicaciones.
 
 ### El `box`
 
-El rectángulo que interpola entre cerrado y abierto. Acá vive el parpadeo:
+El rectángulo que interpola entre cerrado y abierto. Aquí vive el parpadeo:
 
 ```qml
 property real flash: 0
@@ -420,40 +375,42 @@ readonly property color flashBg: /* mezcla cBg → blanco según flash */
 color: box.flash > 0 ? box.flashBg : root.cBg
 ```
 
-`onWantFlashChanged` resetea `flash` a 0, así al abrir el widget el color vuelve al negro de golpe en vez de quedar en un gris intermedio.
+`onWantFlashChanged` reinicia `flash` a 0, así que al abrir el widget el color vuelve al negro de golpe en vez de quedarse en un gris intermedio.
 
-El `radius: Math.min(24, width / 2, height / 2)` con `topLeftRadius` y `topRightRadius` en 0 hace que se vea como una pestaña redondeada solo por abajo.
+`radius: Math.min(24, width / 2, height / 2)` con `topLeftRadius` y `topRightRadius` en 0 lo dibuja como una pestaña redondeada solo por abajo.
 
 ### Los ojitos
 
-Dos `Rectangle` de 5×8 px con `radius: 2.5`. La animación de parpadeo es una `SequentialAnimation` sobre `eyes.blink`: pausa 3,8 s, cierra 70 ms, abre 90 ms, pausa 400 ms, repite. Corre solo con `running: !win.open`.
+Viven en `components/Eyes.qml`. Dos `Rectangle` de 5×8 px con `radius: 2.5`. La animación es una `SequentialAnimation` sobre `eyes.blink`: pausa de 3,8 s, cierra en 70 ms, abre en 90 ms, pausa de 400 ms y un segundo parpadeo. Solo corre con `running: !expanded`. El componente recibe el estado por propiedades (`blink`, `flash`, `progress`, `expanded`) y no conoce a `root` ni `win`.
 
-### Header
+### Encabezado
+
+En `components/Header.qml`:
 
 ```
-id-sesión   nuevo          🔊   ✕
+id-sesión   nuevo                        🔊   ✕
 ```
 
-El `Text` del `sessionID` usa `Layout.maximumWidth: 240` con `elide: Text.ElideMiddle`, así los IDs largos se recortan por el medio sin comerse el espacio de los botones. El `Item { Layout.fillWidth: true }` entre "nuevo" y el volumen empuja los dos íconos juntos contra el borde derecho.
+El ID de sesión usa `Layout.maximumWidth` y `elide: Text.ElideMiddle` para que los IDs largos no se coman el espacio de los botones. Un `Item { Layout.fillWidth: true }` empuja volumen y cierre contra el borde derecho. Las acciones (`nuevo`, silenciar, cerrar) se exponen como señales (`newRequested`, `muteRequested`, `closeRequested`) que `meowko.qml` conecta.
 
 ### Mensajes
 
-Cada fila es un `delegate` que decide su alto:
+El `delegate` vive en `components/MessageList.qml`, que arma cada fila con `UserBubble.qml`, `AiMessage.qml` y `ThinkingDots.qml`. Hay dos roles: `user` y `ai`. Cada fila decide su alto:
 
 ```qml
-height: model.role === "user" ? bubble.height
-        : (model.text === "" ? 14 : aiText.height + 24)
+height: model.role === "user" ? userBubble.height
+      : (model.text === "" ? 14 : aiMessage.bodyHeight + 24)
 ```
 
-Los 24 px extra son para el ícono de copiar. Tu mensaje va en burbuja redondeada a la derecha, con el ancho limitado al 82% del row:
+Los 24 px extra de las respuestas son para el ícono de copiar. El mensaje del usuario va en una burbuja a la derecha, limitada al 82 % del ancho de la fila:
 
 ```qml
 width: Math.min(implicitWidth, row.width * 0.82)
 ```
 
-La respuesta es `Text` plano a la izquierda con `textFormat: Text.MarkdownText` y `lineHeight: 1.25`. Los links salen en blanco.
+La respuesta es `Text` plano a la izquierda con `textFormat: Text.MarkdownText`.
 
-El placeholder de la IA es un mensaje con `text: ""`, y eso es lo que dispara los tres puntitos. `onCountChanged` lleva la vista al final; un `Connections` a `root.answered()` sube tu mensaje al principio de la vista para que la respuesta entre por abajo.
+El placeholder de la IA es una fila con `text: ""`, y eso dispara los tres puntitos. `onCountChanged` lleva la vista al final; `meowko.qml` escucha `root.answered()` y avisa a `MessageList` por su señal `responded`, que sube tu mensaje al principio para que la respuesta entre por abajo.
 
 ### Copiar
 
@@ -465,11 +422,17 @@ onClicked: {
 }
 ```
 
-`Quickshell.clipboardText` es una propiedad nativa (writable, con su `clipboardTextChanged`), así que no hace falta `wl-copy`. El `Timer` de 1.2 s vuelve el ícono a `\uF0C5`. Se usa una property `copied` en vez de reasignar `text`, porque asignar a un `Text` con binding lo rompe.
+`Quickshell.clipboardText` es una propiedad nativa y escribible, así que no hace falta `wl-copy`. Se usa una propiedad `copied` en lugar de reasignar `text`, porque asignar a un `Text` con binding lo rompe.
 
-### Input
+### Input, autocompletado y cancelación
 
-`TextInput` dentro de un `Rectangle` de 38 px con `radius: 19`. `onAccepted` manda y limpia; `Keys.onEscapePressed` cierra. El placeholder `"pregunta algo…"` es un `Text` hijo que se muestra cuando `input.text === ""`, con `font: input.font` para que herede la tipografía.
+`TextInput` dentro de un `Rectangle` de 38 px con `radius: 19`.
+
+- `onAccepted`: si el texto empieza con `/` va a `runCommand()`; si no, a `send()`.
+- `Keys.onTabPressed`: completa la primera sugerencia del popup.
+- `Keys.onEscapePressed`: cierra el popup; si no hay popup y hay una petición en curso, el primer `Esc` arma la cancelación y el segundo la ejecuta; si no hay petición, cierra el widget.
+
+El popup de comandos es un `Rectangle` flotante sobre el input. Calcula sus sugerencias filtrando `root.commands` por lo escrito, y solo aparece mientras no haya un espacio en el texto. El botón ■ junto al input solo es visible mientras `proc.running`.
 
 ---
 
@@ -490,28 +453,24 @@ Item {
         asynchronous: true
         cache: true
         smooth: false
-        source: cat.busy ? "gato_tranquilo.gif" : "gato_dormido.gif"
+        source: cat.busy ? "../assets/gato_tranquilo.gif" : "../assets/gato_dormido.gif"
     }
 }
 ```
 
-- **`smooth: false`** fuerza vecino-nearest. Sin esto el reescalado a 26 px interpola y el pixel art se ve borroso.
-- **No llames `gif.play()`.** En Qt 6.12 el método no existe y Quickshell tira
-  `TypeError: Property 'play' of object QQuickAnimatedImage is not a function`.
-  `AnimatedImage` ya arranca solo cuando `loops: AnimatedImage.Infinite`.
+- **`smooth: false`** fuerza vecino más cercano. Sin esto, el reescalado a 26 px interpola y el pixel art se ve borroso.
+- **No llames `gif.play()`.** En Qt 6.12 el método no existe y Quickshell lanza `TypeError: Property 'play' of object QQuickAnimatedImage is not a function`. `AnimatedImage` ya arranca solo con `loops: AnimatedImage.Infinite`.
 - **`asynchronous: true`** evita que la carga bloquee el render.
-- Las rutas son relativas al `.qml`, así que los GIFs tienen que estar en la misma carpeta.
-- Cambiar `source` reinicia la animación desde el frame 0, que es justo lo que querés al cambiar de estado.
+- Las rutas son relativas al `.qml`: `Cat.qml` está en `components/`, así que los GIFs quedan en `../assets/`.
+- Cambiar `source` reinicia la animación desde el frame 0, que es justo lo que se quiere al cambiar de estado.
 
-> **Los nombres de archivo no pueden tener espacios.** QML resuelve `source` como URL, y un espacio ahí falla en silencio: el `AnimatedImage` queda en `Image.Error`, no dibuja nada y no aparece ningún error en la consola. Renombrá los archivos con guion bajo.
-
-El alto se calcula de la proporción del GIF tranquilo (`150:140`). El dormido es `145:125`, y `PreserveAspectFit` lo deja con un margen vertical que no se nota a este tamaño.
+> **Los nombres de archivo no pueden tener espacios.** QML resuelve `source` como URL y un espacio falla en silencio: el `AnimatedImage` queda en `Image.Error`, no dibuja nada y no aparece ningún error en consola. Usa guion bajo.
 
 ---
 
 ## Personalización
 
-Medidas y paleta, agrupadas arriba en root (`shell.qml:55-80`):
+Medidas y paleta, agrupadas arriba en `root`:
 
 ```qml
 readonly property int closedW: 44    // ancho cerrado
@@ -528,40 +487,41 @@ readonly property color cDim: "#6b6b70"
 readonly property string fontFamily: "Inter"
 ```
 
-**Tamaño del gato** — `Cat.qml:24` y `shell.qml:806`:
+**Tamaño del gato.** En el `Cat { ... }` de `components/InputBar.qml` (el pie del widget), cambia `width` (el alto sale de la proporción). Valores que funcionan: `20`, `26` (recomendado), `32`, `44`.
 
-```qml
-Cat {
-    busy: proc.running
-    width: 26          // el alto sale de la proporción
-}
-```
+**Ritmo del parpadeo.** Son los `duration` de las animaciones `flash` (broadcast del `box` en `meowko.qml`) y `blink` (en `components/Eyes.qml`). Baja los `PauseAnimation` a 0 para un vaivén continuo.
 
-Valores que funcionan: `20` (muy tiny), `26` (recomendado), `32`, `44`.
+**Sonido.** Cambia `soundFile`. Hay varios en `/usr/share/sounds/freedesktop/stereo/`: `complete.oga`, `bell.oga`, `message.oga`, `message-new-instant.oga`.
 
-**Ritmo del parpadeo** — los `duration` en `shell.qml:386-406`. Bajá los `PauseAnimation` a 0 para un vaivén continuo sin pausas.
+**Comandos propios.** Añade una entrada a `root.commands` (para el autocompletado) y un `case` en `runCommand()`.
 
-**Sonido** — cambiá `soundFile`. Hay varios en `/usr/share/sounds/freedesktop/stereo/`: `complete.oga`, `bell.oga`, `message.oga`, `message-new-instant.oga`.
-
-**Gatos propios** — reemplazá los GIFs. Cualquier tamaño funciona, el alto se ajusta solo.
+**Gatos propios.** Reemplaza los GIFs. Cualquier tamaño funciona; el alto se ajusta solo.
 
 ---
 
 ## Problemas conocidos
 
-**No hay streaming.** `StdioCollector.onStreamFinished` espera a que opencode termine, así que la respuesta aparece completa de golpe. Para token a token hay que migrar a un parser incremental: `DataStreamParser` o `SplitParser` de `Quickshell.Io`, con `SplitParser` en modo `\n` que coincide con el formato JSON Lines de opencode.
+**No hay streaming.** `StdioCollector.onStreamFinished` espera a que opencode termine, así que la respuesta aparece completa. Para ir viéndola hay que migrar a un parser incremental, `SplitParser` de `Quickshell.Io` con separador `\n`, que coincide con el formato JSON Lines. Antes de hacerlo conviene comprobar con `opencode run --format json` cuántos eventos `text` emite realmente: si solo emite uno por mensaje, el streaming no aportaría nada.
 
-**La ruta de opencode.** `opencodeBin` asume una instalación vía bun (`~/.cache/.bun/bin/opencode`). Si la tuya es distinta, ver [Rutas y portabilidad](#rutas-y-portabilidad). Es lo único que puede requerir un toque al instalar en otra máquina.
+**Se lanza un proceso nuevo por mensaje.** Cada petición paga el arranque de opencode. Una alternativa es mantener `opencode serve` y hablarle por HTTP.
 
 **Copiar se lleva el markdown crudo.** `model.text` guarda lo que vino de opencode, con `**` y backticks incluidos.
 
-**`Inter` es opcional de verdad.** Si no la tenés, Qt cae a la fuente por defecto y se ve distinto pero no se rompe. La Nerd Font en cambio sí es obligatoria, ver [Requisitos](#requisitos).
+**`/cd` no valida la ruta.** Si el directorio no existe, el proceso no arranca y verás "(sin respuesta, código …)".
+
+**`/agent` no valida el nombre.** Un agente inexistente falla al enviar el siguiente mensaje. Usa `/agents` para ver los válidos.
+
+**`/agents` y `/sessions` muestran la salida tal cual.** El formato de esos subcomandos lo decide opencode.
+
+**El historial no se recupera.** Con `/session <id>` o al reiniciar el widget, opencode recuerda la conversación pero el widget no la muestra.
+
+**`Inter` es opcional.** Si no está, Qt usa la fuente por defecto y se ve distinto, pero no se rompe. La Nerd Font sí es obligatoria (ver [Requisitos](#requisitos)).
 
 **Sin `onExited` en `bell`.** Si `pw-play` no está instalado, el aviso falla en silencio.
 
-**Solo Wayland.** `WlrLayerShell` no existe en X11.
+**Solo Wayland.** `wlr-layer-shell` no existe en X11.
 
-**Warning de ABI de Qt.** Si al arrancar ves esto:
+**Warning de ABI de Qt.** Si al arrancar aparece:
 
 ```
 Quickshell was built against Qt 6.11.2 but the system has updated to Qt 6.12.0
@@ -569,17 +529,34 @@ without rebuilding the package. This is likely to cause crashes, so the
 quickshell package must be rebuilt.
 ```
 
-No es culpa de este repo, es el paquete de Arch desactualizado contra el Qt del
-sistema. Se arregla reconstruyendo:
+no es un problema de este repo: el paquete de Quickshell quedó desactualizado respecto al Qt del sistema. Se arregla reconstruyéndolo (`yay -S quickshell`). Mientras tanto el widget suele funcionar, pero si hay crashes aleatorios, empieza por ahí.
 
-```bash
-yay -S quickshell
-```
+---
 
-El widget anda igual mientras tanto, pero si te crashea aleatoriamente, empezá por acá.
+## Roadmap
+
+Pendiente:
+
+- [x] Reorganizar el código: `assets/` para los GIFs y `components/` para cada componente QML
+- [ ] Mostrar el modelo activo
+- [ ] Cambiar de modelo (`/model`, `/models`)
+- [ ] Comandos con `/` y autocompletado
+- [ ] Cancelar una petición (`Esc` dos veces, ■, `/cancel`)
+- [ ] Elegir agente (`/agent`)
+- [ ] Cambiar de sesión (`/sessions`, `/session`)
+- [ ] Directorio de trabajo (`/cd`)
+- [ ] Detectar opencode automáticamente con `command -v`
+- [ ] Streaming con `SplitParser`
+- [ ] Mostrar avisos de uso excedido y de reintento (p. ej. "Free usage exceeded… retrying in 8m 32s")
+- [ ] Mostrar el historial al retomar una sesión
+- [ ] Entrada multilínea (`Shift+Enter`) e historial con la flecha arriba
+- [ ] Bloques de código con botón de copiar propio y copiar sin markdown crudo
+- [ ] Adjuntar archivos
+- [ ] Atajo global para abrir y cerrar el widget
+- [ ] Arranque más rápido (servidor persistente en lugar de un proceso por mensaje)
 
 ---
 
 ## Licencia
 
-MIT © 2026 [Gxstavo-dev](https://github.com/Gxstavo-dev) — ver [LICENSE](LICENSE).
+MIT © 2026 [Gxstavo-dev](https://github.com/Gxstavo-dev). Ver [LICENSE](LICENSE).

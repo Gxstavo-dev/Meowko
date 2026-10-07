@@ -6,8 +6,8 @@
 // in sync and no polling — the image changes the instant the process starts
 // or stops.
 //
-//   busy === false  ->  gato_dormido.gif    (145x125, 28 frames)
-//   busy === true   ->  gato_tranquilo.gif  (150x140, 34 frames)
+//   busy === false  ->  ../assets/gato_dormido.gif     (145x125, 28 frames)
+//   busy === true   ->  ../assets/gato_tranquilo.gif   (150x140, 34 frames)
 // ============================================================================
 
 import QtQuick
@@ -24,10 +24,11 @@ Item {
     width: 26
     height: Math.round(width * 140 / 150)
 
-    // Both GIFs must sit next to this file. QML resolves `source` as a URL
-    // relative to the .qml location, and a space in a filename fails silently
-    // (status becomes Image.Error with nothing drawn and no console error) —
-    // so keep the names underscore-separated.
+    // The GIFs live in `assets/` next to the `components/` folder. QML
+    // resolves `source` as a URL relative to this .qml, so from here the path
+    // is `../assets/`. A space in a filename fails silently (status becomes
+    // Image.Error with nothing drawn and no console error) — so keep the names
+    // underscore-separated.
     AnimatedImage {
         id: gif
         anchors.fill: parent
@@ -51,6 +52,6 @@ Item {
 
         // Changing `source` restarts the animation from frame 0, which is
         // exactly the desired behaviour on a state change.
-        source: cat.busy ? "gato_tranquilo.gif" : "gato_dormido.gif"
+        source: cat.busy ? "../assets/gato_tranquilo.gif" : "../assets/gato_dormido.gif"
     }
 }

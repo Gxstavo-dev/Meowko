@@ -4,16 +4,25 @@ import QtCore
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "components"
 
 // ============================================================================
-// meowkow — plantilla generalizada de meowko, una widget Wayland/panel-shell
-// que chatea con opencode.
+// meowko — plantilla generalizada, una widget Wayland/panel-shell que chatea
+// con opencode.
 //
 // Este archivo es la versión portátil: NO trae ningún path hardcodeado y
 // funciona para cualquier usuario. Copialo a tu config y editalo libremente:
 //
-//     cp meowkow.qml shell.qml
+//     cp -r meowko.qml components assets ~/.config/quickshell/
+//     mv ~/.config/quickshell/meowko.qml ~/.config/quickshell/shell.qml
 //     quickshell              # o el alias qs
+//
+// Estructura:
+//
+//     meowko.qml        -> ShellRoot, estado, lógica de opencode, ventana
+//     components/       -> Cat, Eyes, Header, MessageList, UserBubble,
+//                          AiMessage, ThinkingDots, InputBar
+//     assets/           -> los GIFs del gato y el ícono
 //
 // Closed: a 44x18 black bar with two blinking eyes, pinned to the top edge of
 // the screen. Click it and it expands into a 600x340 chat bubble.
@@ -348,7 +357,7 @@ ShellRoot {
             onOpenChanged: {
                 if (open) {
                     root.unread = false;
-                    Qt.callLater(() => input.forceActiveFocus());
+                    Qt.callLater(() => inputBar.focusInput());
                 }
             }
 
@@ -452,75 +461,17 @@ ShellRoot {
                     onClicked: root.activeScreen = win.modelData.name
                 }
 
-                // The eyes. Two 5x8 rounded rects whose height is scaled by
-                // `blink`, giving the impression of a squint. Only visible
-                // while collapsed: opacity fades out by 33% of the opening
-                // progress (see below).
+                // The eyes — now a component (components/Eyes.qml). Anchored
+                // here; flash/progress/expanded are passed in as properties so
+                // the component needs no knowledge of `box` or `win`.
 
-                Item {
-                    id: eyes
+                Eyes {
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 20
                     height: root.closedH
-                    opacity: Math.max(0, 1 - win.progress * 3)
-                    visible: opacity > 0
-
-                    // Squint factor, 1 = open, 0.1 = closed. Driven by the
-                    // SequentialAnimation below.
-
-                    property real blink: 1
-
-                    // Idle blink: long pause, quick close, quick open, short
-                    // pause, then a second blink — a double-blink reads as
-                    // more lifelike than a single one. Only runs while closed.
-
-                    SequentialAnimation on blink {
-                        loops: Animation.Infinite
-                        running: !win.open
-                        PauseAnimation {
-                            duration: 3800
-                        }
-                        NumberAnimation {
-                            to: 0.1
-                            duration: 70
-                        }
-                        NumberAnimation {
-                            to: 1
-                            duration: 90
-                        }
-                        PauseAnimation {
-                            duration: 400
-                        }
-                        NumberAnimation {
-                            to: 0.1
-                            duration: 70
-                        }
-                        NumberAnimation {
-                            to: 1
-                            duration: 90
-                        }
-                    }
-
-                    // The eyes invert to black as `flash` rises. Without this
-                    // they would be white-on-white and vanish at peak flash.
-
-                    Rectangle {
-                        x: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 5
-                        height: 8 * eyes.blink
-                        radius: 2.5
-                        color: box.flash > 0 ? Qt.rgba(1 - box.flash, 1 - box.flash, 1 - box.flash) : "white"
-                    }
-                    Rectangle {
-                        x: 13
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 5
-                        height: 8 * eyes.blink
-                        radius: 2.5
-                        color: box.flash > 0 ? Qt.rgba(1 - box.flash, 1 - box.flash, 1 - box.flash) : "white"
-                    }
+                    flash: box.flash
+                    progress: win.progress
+                    expanded: win.open
                 }
 
                 // The expanded UI: header, message list, input. Sized to the
@@ -537,345 +488,72 @@ ShellRoot {
                     opacity: Math.max(0, (win.progress - 0.6) / 0.4)
                     visible: opacity > 0
 
-                    // Header: session ID + "nuevo" on the left, then a
-                    // fillWidth spacer pushes the volume and close icons
-                    // together against the right edge.
-                    RowLayout {
+                    // -- Header -------------------------------------------------
+                    // Session name + "nuevo" on the left, volume and close on
+                    // the right. Interaction is surfaced as signals so the
+                    // component only knows about the session state.
+                    Header {
                         Layout.fillWidth: true
                         Layout.topMargin: 12
                         Layout.leftMargin: 20
                         Layout.rightMargin: 20
-
-                        // Active session ID. maximumWidth + ElideMiddle keeps
-                        // long IDs from eating the space the icons need.
-                        Text {
-                            Layout.maximumWidth: 240
-                            Layout.leftMargin: 12
-                            horizontalAlignment: Text.AlignLeft
-                            elide: Text.ElideMiddle
-                            text: root.sessionId === "" ? "sin sesión" : root.sessionId
-                            font.family: root.fontFamily
-                            font.pixelSize: 9
-                            font.letterSpacing: 0.5
-                            color: root.cDim
-                            opacity: 0.8
-                        }
-                        Text {
-                            id: newBtn
-                            Layout.leftMargin: 6
-                            text: "nuevo"
-                            font.family: root.fontFamily
-                            font.pixelSize: 11
-                            color: newMa.containsMouse ? root.cText : root.cDim
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 120
-                                }
-                            }
-                            MouseArea {
-                                id: newMa
-                                anchors.fill: parent
-                                anchors.margins: -6
-                                hoverEnabled: true
-                                onClicked: root.newChat()
-                            }
-                        }
-
-                        // Spacer. The header has no spacing, so this is what
-                        // separates the left group from the right-hand icons.
-                        Item {
-                            Layout.fillWidth: true
-                        }
-
-                        Text {
-                            id: volBtn
-                            // Volume toggle. Glyphs are Nerd Font private-use
-                            // codepoints written as \uXXXX escapes: U+F028 is
-                            // volume-high, U+F026 is volume-mute. Escapes keep
-                            // the file readable regardless of encoding.
-
-                            text: root.muted ? "\uF026" : "\uF028"
-                            font.family: "JetBrainsMono Nerd Font"
-                            font.pixelSize: 14
-                            color: volMa.containsMouse ? root.cText : root.cDim
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 120
-                                }
-                            }
-                            MouseArea {
-                                id: volMa
-                                anchors.fill: parent
-                                anchors.margins: -6
-                                hoverEnabled: true
-                                onClicked: root.muted = !root.muted
-                            }
-                        }
-
-                        Text {
-                            Layout.leftMargin: 10
-                            text: "✕"
-                            font.pixelSize: 11
-                            color: closeMa.containsMouse ? root.cText : root.cDim
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 120
-                                }
-                            }
-                            MouseArea {
-                                id: closeMa
-                                anchors.fill: parent
-                                anchors.margins: -6
-                                hoverEnabled: true
-                                onClicked: root.activeScreen = ""
-                            }
-                        }
+                        sessionId: root.sessionId
+                        muted: root.muted
+                        textColor: root.cText
+                        dimColor: root.cDim
+                        fontFamily: root.fontFamily
+                        onNewRequested: root.newChat()
+                        onMuteRequested: root.muted = !root.muted
+                        onCloseRequested: root.activeScreen = ""
                     }
 
-                    // -----------------------------------------------------------------
-                    // Message list
-                    // -----------------------------------------------------------------
-                    ListView {
-                        id: list
+                    // -- Message list ------------------------------------------
+                    // The transcript. Scroll behaviour lives inside the
+                    // component; `responded` asks it to jump back to your
+                    // message when a fresh answer lands.
+                    MessageList {
+                        id: msgList
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.leftMargin: 20
                         Layout.rightMargin: 20
-                        clip: true
-                        spacing: 12
                         model: chat
-
-                        // Right after sending, scroll down: you want to see your own message and the dots.
-                        onCountChanged: positionViewAtEnd()
-
-                        // When the answer lands, jump back so YOUR message sits
-                        // at the top and the reply scrolls in beneath it.
-                        Connections {
-                            target: root
-                            function onAnswered() {
-                                list.positionViewAtIndex(Math.max(0, chat.count - 2), ListView.Beginning);
-                            }
-                        }
-
-                        delegate: Item {
-                            id: row
-                            width: ListView.view.width
-                            // Height per role: the bubble sizes itself, the
-                            // empty AI row is a fixed 14px strip for the dots,
-                            // and a real response gets its text height + 24 to
-                            // make room for the copy button underneath.
-
-                            height: model.role === "user" ? bubble.height : (model.text === "" ? 14 : aiText.height + 24)
-
-                            // User message: a rounded bubble on the right.
-                            Rectangle {
-                                id: bubble
-                                visible: model.role === "user"
-                                anchors.right: parent.right
-                                width: userText.width + 24
-                                height: userText.height + 16
-                                radius: 14
-                                color: root.cBubble
-
-                                Text {
-                                    id: userText
-                                    x: 12
-                                    y: 8
-                                    width: Math.min(implicitWidth, row.width * 0.82)
-                                    // Cap the bubble at 82% of the row so long
-                                    // messages wrap instead of spanning the window.
-                                    text: model.role === "user" ? model.text : ""
-                                    wrapMode: Text.Wrap
-                                    color: root.cText
-                                    font.family: root.fontFamily
-                                    font.pixelSize: 13
-                                }
-                            }
-
-                            // AI response: no bubble, plain text on the left,
-                            // rendered as Markdown.
-                            Text {
-                                id: aiText
-                                visible: model.role === "ai" && model.text !== ""
-                                width: parent.width
-                                text: model.role === "ai" ? model.text : ""
-                                textFormat: Text.MarkdownText
-                                wrapMode: Text.Wrap
-                                color: root.cAi
-                                linkColor: "white"
-                                lineHeight: 1.25
-                                font.family: root.fontFamily
-                                font.pixelSize: 13
-                            }
-
-                            // Copy the response to the clipboard.
-                            Text {
-                                id: copyBtn
-                                visible: model.role === "ai" && model.text !== ""
-                                anchors.left: parent.left
-                                anchors.top: aiText.bottom
-                                anchors.topMargin: 6
-
-                                // Local feedback state. A property rather than
-                                // reassigning `text`, because writing to a Text
-                                // that has a binding would permanently break it.
-
-                                property bool copied: false
-
-                                // U+F0C5 copy icon, swaps to U+F00C check
-                                // briefly after a successful copy.
-
-                                text: copied ? "\uF00C" : "\uF0C5"
-                                font.family: "JetBrainsMono Nerd Font"
-                                font.pixelSize: 13
-                                color: copyMa.containsMouse || copied ? root.cText : root.cDim
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 120
-                                    }
-                                }
-                                MouseArea {
-                                    id: copyMa
-                                    anchors.fill: parent
-                                    anchors.margins: -6
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        // clipboardText is a native writable
-                                        // Quickshell property, so no external
-                                        // clipboard tool (wl-copy) is needed.
-                                        // Note: this copies the raw markdown.
-
-                                        Quickshell.clipboardText = model.text;
-                                        copyBtn.copied = true;
-                                        copyReset.restart();
-                                    }
-                                }
-                                Timer {
-                                    id: copyReset
-                                    // How long the checkmark stays before
-                                    // reverting to the copy icon.
-
-                                    interval: 1200
-                                    onTriggered: copyBtn.copied = false
-                                }
-                            }
-
-                            // "Thinking" dots. Shown only while the AI row is
-                            // the empty placeholder; setLast() replaces it
-                            // with the real text when the response completes.
-                            Row {
-                                visible: model.role === "ai" && model.text === ""
-                                spacing: 5
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                Repeater {
-                                    model: 3
-                                    Rectangle {
-                                        id: dotItem
-                                        required property int index
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: root.cDim
-                                        opacity: 0.25
-
-                                        // Staggered pulse. The leading pause is
-                                        // index * 160ms and the trailing one is
-                                        // (2 - index) * 160ms, so each dot fades
-                                        // in sequence and the group loops as a
-                                        // travelling wave rather than three dots
-                                        // blinking in unison.
-
-                                        SequentialAnimation on opacity {
-                                            loops: Animation.Infinite
-                                            running: dotItem.visible
-                                            PauseAnimation {
-                                                duration: dotItem.index * 160
-                                            }
-                                            NumberAnimation {
-                                                to: 1
-                                                duration: 320
-                                            }
-                                            NumberAnimation {
-                                                to: 0.25
-                                                duration: 320
-                                            }
-                                            PauseAnimation {
-                                                duration: (2 - dotItem.index) * 160
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        bubbleColor: root.cBubble
+                        textColor: root.cText
+                        aiColor: root.cAi
+                        dimColor: root.cDim
+                        fontFamily: root.fontFamily
                     }
 
-                    // -----------------------------------------------------------------
-                    // Footer: status cat + prompt input
-                    // -----------------------------------------------------------------
-                    RowLayout {
+                    // -- Footer -------------------------------------------------
+                    // Status cat + prompt input. `busy` is wired straight to
+                    // the process state; sending and closing are signals.
+                    InputBar {
+                        id: inputBar
                         Layout.fillWidth: true
                         Layout.leftMargin: 14
                         Layout.rightMargin: 14
                         Layout.bottomMargin: 14
-                        spacing: 10
-
-                        // The status cat. `busy` is wired straight to
-                        // proc.running, so it swaps between the two GIFs with
-                        // no extra state to keep in sync.
-
-                        Cat {
-                            Layout.alignment: Qt.AlignVCenter
-                            busy: proc.running
-                            width: 26
-                        }
-
-                        // The prompt: pill-shaped (height 38, radius 19),
-                        // filling the remaining width next to the cat.
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 38
-                            radius: 19
-                            color: root.cInput
-
-                            TextInput {
-                                id: input
-                                anchors.fill: parent
-                                anchors.leftMargin: 16
-                                anchors.rightMargin: 16
-                                verticalAlignment: TextInput.AlignVCenter
-                                font.family: root.fontFamily
-                                font.pixelSize: 13
-                                color: root.cText
-                                selectionColor: "white"
-                                selectedTextColor: "black"
-                                clip: true
-
-                                // Enter sends and clears. Escape closes the
-                                // whole widget from anywhere in the field.
-
-                                onAccepted: {
-                                    root.send(text);
-                                    text = "";
-                                }
-                                Keys.onEscapePressed: root.activeScreen = ""
-
-                                // Placeholder. `font: input.font` copies the
-                                // input's font wholesale, so it stays in sync
-                                // if the input's typography changes.
-
-                                Text {
-                                    visible: input.text === ""
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "pregunta algo…"
-                                    color: root.cDim
-                                    font: input.font
-                                }
-                            }
-                        }
+                        busy: proc.running
+                        inputColor: root.cInput
+                        textColor: root.cText
+                        dimColor: root.cDim
+                        fontFamily: root.fontFamily
+                        onSendRequested: root.send(text)
+                        onCloseRequested: root.activeScreen = ""
                     }
                 }
             }
+        }
+    }
+
+    // The main file still owns the cross-component wiring: when a full answer
+    // has been written (root.answered), tell the list to scroll your message
+    // back to the top so the reply slides in underneath it.
+    Connections {
+        target: root
+        function onAnswered() {
+            msgList.responded();
         }
     }
 }

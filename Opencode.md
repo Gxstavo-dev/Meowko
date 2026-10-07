@@ -7,7 +7,7 @@ Este archivo es para que opencode lo lea y haga las tareas **una por una**.
 Meowko es un widget de Wayland hecho en QML (Quickshell) que funciona como una "Dynamic Island" en el panel superior y chatea con opencode.
 
 - Archivo principal: `meowko.qml` (plantilla; `shell.qml` es la copia de trabajo y está en `.gitignore`).
-- El gato está en `Cat.qml` y los GIFs `gato_dormido.gif` / `gato_tranquilo.gif`.
+- El gato está en `components/Cat.qml`, los GIFs (`gato_dormido.gif` / `gato_tranquilo.gif`) y el ícono en `assets/`, y el resto de los componentes visuales en `components/` (`Eyes`, `Header`, `MessageList`, `UserBubble`, `AiMessage`, `ThinkingDots`, `InputBar`).
 - Cada mensaje lanza `opencode run --format json` y se parsea al terminar el proceso.
 - Documentación: `README.md`. Los comentarios del código van en inglés y explican el _porqué_.
 
@@ -34,7 +34,7 @@ Meowko es un widget de Wayland hecho en QML (Quickshell) que funciona como una "
 - [x] **0. Crear la rama `meowko`.**
       Desde `main`: `git checkout -b meowko` y `git push -u origin meowko`. A partir de aquí todo avance se commitea y se sube a esa rama. No toques `main`.
 
-- [ ] **1. Reorganizar los archivos.**
+- [x] **1. Reorganizar los archivos.**
       Es una refactorización pura: **no cambia ninguna funcionalidad ni el aspecto**. El objetivo es que el código sea más legible y mantenible en lugar de un solo archivo de unas 800 líneas.
 
   1. Renombra `meowkow.qml` a `meowko.qml` con `git mv` (el nombre actual es un typo) y corrige todas las referencias en el proyecto.
