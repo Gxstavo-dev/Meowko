@@ -49,6 +49,13 @@ ShellRoot {
     property string activeScreen: ""
     property string sessionId: ""
 
+    // Active model / agent, "" = the one opencode picks by default. Only
+    // shown in the header and forwarded with --model / --agent; changing them
+    // comes later (tareas 4 y 6). Persisted in meowko-prefs.
+
+    property string model: ""
+    property string agent: ""
+
     // When true, ding() is a no-op. Only silences the sound — the blinking
     // alert still runs, since that is a visual cue with a different purpose.
 
@@ -133,14 +140,34 @@ ShellRoot {
         blockLoading: true
     }
 
-    // Restore the last session on startup. A missing or corrupt file falls back
-    // to "" and starts a fresh conversation rather than throwing.
+    // Persists model/agent (JSON) across restarts. The /comandos that write
+    // to it arrive in later tareas; reading it here is what lets the header
+    // show your last choice at startup.
+
+    FileView {
+        id: prefsFile
+        path: homePath + "/.local/state/meowko-prefs"
+        blockLoading: true
+    }
+
+    // Restore the last session and preferences on startup. Missing or corrupt
+    // files fall back to defaults rather than throwing.
 
     Component.onCompleted: {
         try {
             root.sessionId = sidFile.text().trim();
         } catch (e) {
             root.sessionId = "";
+        }
+        try {
+            const prefs = JSON.parse(prefsFile.text());
+            if (prefs.model)
+                root.model = prefs.model;
+            if (prefs.agent)
+                root.agent = prefs.agent;
+        } catch (e) {
+            root.model = "";
+            root.agent = "";
         }
         console.log("sesión cargada:", root.sessionId === "" ? "(ninguna)" : root.sessionId);
     }
@@ -174,6 +201,16 @@ ShellRoot {
         root.sessionId = "";
         sidFile.setText("");
     }
+
+    // Persist model/agent so the header and the next run pick them up.
+    function savePrefs() {
+        prefsFile.setText(JSON.stringify({
+            model: root.model,
+            agent: root.agent
+        }));
+    }
+    onModelChanged: root.savePrefs()
+    onAgentChanged: root.savePrefs()
 
     // ---------------------------------------------------------------------
     // opencode bridge
@@ -267,16 +304,22 @@ ShellRoot {
         });   // empty text => render the thinking dots
 
         // The command is wrapped in `sh -c` and the arguments are passed as
-        // positional params ($0, $1, $2) rather than interpolated into the
-        // string. That keeps prompts containing quotes, backticks or $ safe
-        // from breaking the shell. stdin is closed and stderr folded into
-        // stdout so stray output can't corrupt the JSON stream.
+        // positional params ($0..$4) rather than interpolated into the string.
+        // That keeps prompts containing quotes, backticks or $ safe from
+        // breaking the shell, and user text only ever appears as "$1". Flags
+        // are inserted only when there is a value to attach. stdin is closed
+        // and stderr folded into stdout so stray output can't corrupt the
+        // JSON stream.
 
-        if (root.sessionId === "") {
-            proc.command = ["sh", "-c", 'exec "$0" run --format json "$1" < /dev/null 2>&1', opencodeBin, t];
-        } else {
-            proc.command = ["sh", "-c", 'exec "$0" run --format json --session "$2" "$1" < /dev/null 2>&1', opencodeBin, t, root.sessionId];
-        }
+        let sh = 'exec "$0" run --format json';
+        if (root.model !== "")
+            sh += ' --model "$2"';
+        if (root.agent !== "")
+            sh += ' --agent "$3"';
+        if (root.sessionId !== "")
+            sh += ' --session "$4"';
+        sh += ' "$1" < /dev/null 2>&1';
+        proc.command = [sh, opencodeBin, t, root.model, root.agent, root.sessionId];
         proc.running = true;
     }
 
@@ -499,6 +542,8 @@ ShellRoot {
                         Layout.rightMargin: 20
                         sessionId: root.sessionId
                         muted: root.muted
+                        model: root.model
+                        agent: root.agent
                         textColor: root.cText
                         dimColor: root.cDim
                         fontFamily: root.fontFamily

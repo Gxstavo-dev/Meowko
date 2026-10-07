@@ -58,7 +58,7 @@ Meowko es un widget de Wayland hecho en QML (Quickshell) que funciona como una "
 
 Estas tareas parten del código local, el que está en la computadora del usuario. Impleméntalas tú desde cero según lo descrito y pruébalas.
 
-- [ ] **2. Mostrar el modelo activo.**
+- [x] **2. Mostrar el modelo activo.**
       El encabezado muestra modelo y agente activos (o "modelo por defecto"). Se guardan en `~/.local/state/meowko-prefs` (JSON) y se leen al arrancar con `try/catch`.
 
 - [ ] **3. Comandos con `/` y autocompletado.**

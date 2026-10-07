@@ -388,10 +388,12 @@ Viven en `components/Eyes.qml`. Dos `Rectangle` de 5×8 px con `radius: 2.5`. La
 En `components/Header.qml`:
 
 ```
-id-sesión   nuevo                        🔊   ✕
+id-sesión   nuevo   modelo · agente              🔊   ✕
 ```
 
-El ID de sesión usa `Layout.maximumWidth` y `elide: Text.ElideMiddle` para que los IDs largos no se coman el espacio de los botones. Un `Item { Layout.fillWidth: true }` empuja volumen y cierre contra el borde derecho. Las acciones (`nuevo`, silenciar, cerrar) se exponen como señales (`newRequested`, `muteRequested`, `closeRequested`) que `meowko.qml` conecta.
+El ID de sesión usa `Layout.maximumWidth` y `elide: Text.ElideMiddle` para que los IDs largos no se coman el espacio de los botones. Después de "nuevo" se muestra el **modelo y agente activos** (props `model`/`agent`); si ambos están vacíos, "modelo por defecto". Un `Item { Layout.fillWidth: true }` empuja volumen y cierre contra el borde derecho. Las acciones (`nuevo`, silenciar, cerrar) se exponen como señales (`newRequested`, `muteRequested`, `closeRequested`) que `meowko.qml` conecta.
+
+El modelo y el agente vienen de `~/.local/state/meowko-prefs` (JSON) al arrancar y se guardan con `savePrefs()` cada vez que cambian. Se pasan a opencode con `--model` y `--agent` en cada petición, solo cuando están cargados.
 
 ### Mensajes
 
