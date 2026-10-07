@@ -383,7 +383,7 @@ ShellRoot {
             root.sys("ya se está consultando, esperá un momento");
             return;
         }
-        lister.command = ["sh", "-c", 'exec "$0" models < /dev/null 2>&1', root.opencodeBin];
+        lister.command = ["sh", "-c", 'if command -v opencode >/dev/null 2>&1; then exec opencode models < /dev/null 2>&1; elif [ -x "$0" ]; then exec "$0" models < /dev/null 2>&1; else exit 127; fi', root.opencodeBin];
         lister.running = true;
     }
 
@@ -903,7 +903,7 @@ ShellRoot {
             root.sys("ya se está consultando, esperá un momento");
             return;
         }
-        agentLister.command = ["sh", "-c", 'exec "$0" agent list < /dev/null 2>&1', root.opencodeBin];
+        agentLister.command = ["sh", "-c", 'if command -v opencode >/dev/null 2>&1; then exec opencode agent list < /dev/null 2>&1; elif [ -x "$0" ]; then exec "$0" agent list < /dev/null 2>&1; else exit 127; fi', root.opencodeBin];
         agentLister.running = true;
     }
 
