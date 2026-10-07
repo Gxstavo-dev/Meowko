@@ -70,6 +70,11 @@ ShellRoot {
     property string listerMode: ""
     property string listerFilter: ""
 
+    // Agent lister state: separate from `lister` because `opencode agent list`
+    // emits permission blobs; we parse only the name lines (name (type)).
+    property string agentListerMode: ""
+    property string agentListerFilter: ""
+
     // When true, ding() is a no-op. Only silences the sound — the blinking
     // alert still runs, since that is a visual cue with a different purpose.
 
@@ -188,6 +193,14 @@ ShellRoot {
             hint: "lista los modelos"
         }
         ListElement {
+            name: "/agent"
+            hint: "muestra o cambia el agente"
+        }
+        ListElement {
+            name: "/agents"
+            hint: "lista los agentes"
+        }
+        ListElement {
             name: "/mute"
             hint: "silencia el aviso"
         }
@@ -277,7 +290,7 @@ ShellRoot {
         const cmd = (parts[0] || "").toLowerCase();
         switch (cmd) {
             case "/help":
-                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/model: muestra el modelo\n/model <modelo>: cambia el modelo\n/models [filtro]: lista los modelos\n/cancel: cancela la petición en curso\n/mute: silencia o reactiva el aviso");
+                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/model: muestra el modelo\n/model <modelo>: cambia el modelo\n/models [filtro]: lista los modelos\n/agent [nombre]: muestra o cambia el agente\n/agents [filtro]: lista los agentes\n/cancel: cancela la petición en curso\n/mute: silencia o reactiva el aviso");
                 break;
             case "/new":
             case "/clear":
@@ -294,6 +307,18 @@ ShellRoot {
                 break;
             case "/models":
                 root.modelsList(parts[1] || "");
+                break;
+            case "/agent":
+                if (parts[1] === undefined)
+                    root.sys(root.agent === "" ? "agente: por defecto" : "agente: " + root.agent);
+                else if (parts[1] === "default") {
+                    root.agent = "";
+                    root.sys("agente por defecto restaurado");
+                } else
+                    root.agentSet(parts[1]);
+                break;
+            case "/agents":
+                root.agentsList(parts[1] || "");
                 break;
             case "/mute":
                 root.muted = !root.muted;
@@ -514,6 +539,22 @@ ShellRoot {
             onStreamFinished: {
                 console.log("LISTA:", text);
                 root.useList(text);
+            }
+        }
+    }
+
+    // Agent lister: calls `opencode agent list` and parses only name lines.
+    Process {
+        id: agentLister
+        workingDirectory: homePath
+        environment: ({
+                NO_COLOR: "1",
+                TERM: "dumb"
+            })
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.useAgentList(text);
             }
         }
     }
@@ -832,9 +873,85 @@ ShellRoot {
                         }
                         onCloseRequested: root.activeScreen = ""
                         onCancelRequested: root.cancel()
-                    }
-                }
             }
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Agent list — /agents and /agent. Separated process (agentLister) to
+    // avoid conflating output with `lister` and to only parse name lines.
+    // ---------------------------------------------------------------------
+
+    function agentsList(filtro) {
+        root.agentListerMode = "agents";
+        root.agentListerFilter = filtro.toLowerCase();
+        root.agentListerGo();
+    }
+
+    function agentSet(frag) {
+        root.agentListerMode = "agent";
+        root.agentListerFilter = frag.toLowerCase();
+        root.agentListerGo();
+    }
+
+    function agentListerGo() {
+        if (agentLister.running) {
+            root.sys("ya se está consultando, esperá un momento");
+            return;
+        }
+        agentLister.command = ["sh", "-c", 'exec "$0" agent list < /dev/null 2>&1', root.opencodeBin];
+        agentLister.running = true;
+    }
+
+    function useAgentList(raw) {
+        const mode = root.agentListerMode;
+        const filter = root.agentListerFilter;
+        root.agentListerMode = "";
+        root.agentListerFilter = "";
+        const names = root.cleanAgentList(raw);
+        if (mode === "agent")
+            root.resolveAgent(names, filter);
+        else if (mode === "agents")
+            root.sys(root.buildAgentList(names, filter));
+    }
+
+    // Extract agent ids: lines like "explore (subagent)" -> "explore".
+    // Ignore JSON blocks (they don't match the regex). Also accepts "build (primary)".
+    function cleanAgentList(raw) {
+        const lines = raw.split("\n");
+        const out = [];
+        for (const l of lines) {
+            const m = l.match(/^([A-Za-z0-9_-]+)\s+\((primary|subagent)\)/);
+            if (m)
+                out.push(m[1]);
+        }
+        return out;
+    }
+
+    function buildAgentList(names, filter) {
+        const found = filter === "" ? names : names.filter(l => l.includes(filter));
+        if (found.length === 0)
+            return filter === "" ? "no hay agentes" : "sin resultados para \"" + filter + "\"";
+        return (filter === "" ? "agentes disponibles:\n" : "agentes con \"" + filter + "\":\n") + found.join("\n");
+    }
+
+    function resolveAgent(names, frag) {
+        if (names.includes(frag)) {
+            root.agent = frag;
+            root.sys("agente: " + frag);
+            return;
+        }
+        const matches = names.filter(l => l.includes(frag));
+        if (matches.length === 1) {
+            root.agent = matches[0];
+            root.sys("agente: " + matches[0]);
+        } else if (matches.length === 0) {
+            root.sys("no hay ningún agente que coincida con \"" + frag + "\"");
+        } else {
+            root.sys("varios agentes coinciden:\n" + matches.join("\n")
+                + "\n\nEscribí /agent con un nombre exacto.");
+        }
+    }
         }
     }
 

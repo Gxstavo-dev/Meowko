@@ -70,8 +70,8 @@ Estas tareas parten del código local, el que está en la computadora del usuari
 - [x] **5. Cancelar una petición.**
       Se cancela pulsando **`Esc` dos veces** seguidas: el primer `Esc` con una petición en curso arma la cancelación y muestra el chip "Esc de nuevo para cancelar" junto al input; un segundo `Esc` dentro de 1,5 s la ejecuta. Además `/cancel` y el botón ■ la cancelan de inmediato. Sin petición en curso, `Esc` cierra el widget; con el popup de comandos abierto, solo lo descarta. Al cancelar, envía `SIGINT` (2); si sigue vivo tras 2 s, escala a `SIGTERM`. Conserva el texto parcial y lo marca como _(cancelado)_, sin sonido ni parpadeo. El `exec` hace que la señal llegue a opencode y no quedan huérfanos.
 
-- [ ] **6. Elegir agente.**
-      `/agent [nombre]` muestra o cambia el agente (`--agent`), `/agent default` lo quita, `/agents` lista con `opencode agent list`. Si es posible, valida el nombre contra esa lista.
+- [x] **6. Elegir agente.**
+      `/agent [nombre]` muestra o cambia el agente (`--agent`), `/agent default` lo quita, `/agents` lista con `opencode agent list`. Se parsean solo las líneas `nombre (primary|subagent)`; si hay varios agentes coincidentes con un fragmento, se lista y pide uno exacto. El agente activo se guarda en prefs y se pasa en cada petición.
 
 - [ ] **7. Cambiar de sesión.**
       `/sessions` lista con `opencode session list` y `/session <id>` continúa una sesión (`--session`). Comprueba el formato real de salida y, si ayuda, mejora cómo se muestra.
