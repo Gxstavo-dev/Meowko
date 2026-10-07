@@ -131,7 +131,7 @@ ShellRoot {
 
     readonly property string homePath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "")
 
-    readonly property string opencodeBin: homePath + "/.cache/.bun/install/global/node_modules/opencode-ai/bin/opencode.exe"
+    readonly property string opencodeBin: homePath + "/.cache/.bun/bin/opencode"
 
     // ---------------------------------------------------------------------
     // Geometry
@@ -599,7 +599,7 @@ ShellRoot {
         if (root.sessionId !== "")
             sh += ' --session "$4"';
         sh += ' "$1" < /dev/null 2>&1';
-        proc.command = [sh, opencodeBin, t, root.model, root.agent, root.sessionId];
+        proc.command = ["sh", "-c", 'if command -v opencode >/dev/null 2>&1; then exec opencode run --format json ' + (root.model !== "" ? '--model "$2" ' : '') + (root.agent !== "" ? '--agent "$3" ' : '') + (root.sessionId !== "" ? '--session "$4" ' : '') + '"$1" < /dev/null 2>&1; elif [ -x "$0" ]; then exec "$0" run --format json ' + (root.model !== "" ? '--model "$2" ' : '') + (root.agent !== "" ? '--agent "$3" ' : '') + (root.sessionId !== "" ? '--session "$4" ' : '') + '"$1" < /dev/null 2>&1; else exit 127; fi', opencodeBin, t, root.model, root.agent, root.sessionId];
         proc.running = true;
     }
 
