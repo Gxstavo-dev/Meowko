@@ -80,7 +80,7 @@ Los mensajes que empiezan con `/` los resuelve el widget y **no** se envían a o
 
 El modelo y el agente se pasan a opencode con `--model` y `--agent` en cada petición. Las sesiones pertenecen a un directorio, por eso `/cd` abre una conversación nueva.
 
-> Implementados hasta ahora: `/help`, `/new`, `/clear`, `/mute`, `/model` y `/models`. El resto de la tabla llega en las próximas tareas (`/agent`, `/agents`, `/sessions`, `/session`, `/cd`, `/cancel`).
+> Implementados hasta ahora: `/help`, `/new`, `/clear`, `/mute`, `/model`, `/models` y `/cancel`. El resto de la tabla llega en las próximas tareas (`/agent`, `/agents`, `/sessions`, `/session`, `/cd`).
 
 ---
 
@@ -547,7 +547,7 @@ Pendiente:
 - [x] Mostrar el modelo activo
 - [x] Cambiar de modelo (`/model`, `/models`)
 - [x] Comandos con `/` y autocompletado
-- [ ] Cancelar una petición (`Esc` dos veces, ■, `/cancel`)
+- [x] Cancelar una petición (`Esc` dos veces, ■, `/cancel`)
 - [ ] Elegir agente (`/agent`)
 - [ ] Cambiar de sesión (`/sessions`, `/session`)
 - [ ] Directorio de trabajo (`/cd`)

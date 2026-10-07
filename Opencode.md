@@ -67,15 +67,8 @@ Estas tareas parten del código local, el que está en la computadora del usuari
 - [x] **4. Cambiar de modelo.**
       `/model` muestra el activo, `/model <proveedor/modelo>` lo cambia (acepta un fragmento si solo coincide uno), `/model default` lo quita. `/models [filtro]` lista los disponibles con `opencode models`. El modelo se pasa con `--model` en cada petición. El catálogo lo trae el `Process` `lister`, fresco en cada consulta.
 
-- [ ] **5. Cancelar una petición.**
-      Se cancela pulsando **`Esc` dos veces** seguidas (no `Ctrl+C`):
-  - El primer `Esc` con una petición en curso **no** cierra el widget: arma la cancelación y muestra un aviso breve junto al input ("Esc de nuevo para cancelar").
-  - Un segundo `Esc` dentro de 1,5 s cancela. Si pasa ese tiempo, la cancelación se desarma.
-  - Sin petición en curso, `Esc` sigue cerrando el widget; con el popup de comandos abierto, solo lo descarta.
-  - Además: un botón ■ junto al input y `/cancel`, que cancelan de inmediato.
-  - Al cancelar, envía `SIGINT` (`proc.signal(2)`, el equivalente a `Ctrl+C` para el proceso); si sigue vivo tras 2 s, escala a `SIGTERM`.
-  - Conserva el texto parcial y lo marca como _(cancelado)_, sin sonido ni parpadeo.
-  - Comprueba que el `exec` en el `sh -c` hace que la señal llegue a opencode y que no queden procesos huérfanos (`pgrep -a opencode`).
+- [x] **5. Cancelar una petición.**
+      Se cancela pulsando **`Esc` dos veces** seguidas: el primer `Esc` con una petición en curso arma la cancelación y muestra el chip "Esc de nuevo para cancelar" junto al input; un segundo `Esc` dentro de 1,5 s la ejecuta. Además `/cancel` y el botón ■ la cancelan de inmediato. Sin petición en curso, `Esc` cierra el widget; con el popup de comandos abierto, solo lo descarta. Al cancelar, envía `SIGINT` (2); si sigue vivo tras 2 s, escala a `SIGTERM`. Conserva el texto parcial y lo marca como _(cancelado)_, sin sonido ni parpadeo. El `exec` hace que la señal llegue a opencode y no quedan huérfanos.
 
 - [ ] **6. Elegir agente.**
       `/agent [nombre]` muestra o cambia el agente (`--agent`), `/agent default` lo quita, `/agents` lista con `opencode agent list`. Si es posible, valida el nombre contra esa lista.

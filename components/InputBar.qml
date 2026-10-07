@@ -1,12 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Bottom bar: the status cat plus the input field and its placeholder, and a
-// floating suggestions popup for /comandos (Tab completes, click inserts).
+// Bottom bar: the status cat, the prompt field and its placeholder, a ■ stop
+// button (only while a request runs) plus two floating overlays — the
+// /comandos suggestions popup and the "Esc de nuevo para cancelar" chip.
 //
-// The root is a plain Item so the popup can anchor freely; the actual bar is
-// the RowLayout below. The outer file sets Layout.* on this component, which
-// apply to the Item.
+// The root is a plain Item so the overlays can anchor freely; the actual bar
+// is the RowLayout below. The outer file sets Layout.* on this component,
+// which apply to the Item.
 
 Item {
     id: inputBar
@@ -20,14 +21,40 @@ Item {
     // The command catalogue (a ListModel of {name, hint}) used for the popup.
     property var commands: null
 
+    // A plain Item has zero implicit size; without this the ColumnLayout in
+    // meowko collapses the whole bar (cat + input) to 0 height. The bar's own
+    // implicit height plus its bottom margin is what it really occupies.
+    implicitHeight: bar.implicitHeight + 14
+
     signal sendRequested(string text)
     signal closeRequested
+    signal cancelRequested
 
     // Recalculated suggestions: array of the {name, hint} entries whose name
     // starts with what the user typed and is not yet exactly that.
     property var suggestions: []
     // True after Escape dismissed the popup; typing again clears it.
     property bool suppressed: false
+    // First Escape with a request running armed a cancellation; the second
+    // one within 1.5 s fires cancelRequested(). The chip shows that window.
+    property bool cancelArmed: false
+
+    // Disarms the two-Esc cancellation after 1.5 s.
+    Timer {
+        id: disarmTimer
+        interval: 1500
+        repeat: false
+        onTriggered: inputBar.cancelArmed = false
+    }
+
+    // A finished request can no longer be cancelled; drop the armed state so
+    // the next Escape closes the widget like normal.
+    onBusyChanged: {
+        if (!busy) {
+            inputBar.cancelArmed = false;
+            disarmTimer.stop();
+        }
+    }
 
     // Called on expand so the field is ready to type immediately.
     function focusInput() {
@@ -113,13 +140,25 @@ Item {
                 Keys.onTabPressed: inputBar.complete()
                 Keys.onEscapePressed: {
                     if (inputBar.suggestions.length > 0 && !inputBar.suppressed) {
+                        // popup is up: just dismiss it
                         inputBar.suppressed = true;
+                    } else if (inputBar.busy && inputBar.cancelArmed) {
+                        // second Esc within 1.5 s: cancel right away
+                        inputBar.cancelArmed = false;
+                        disarmTimer.stop();
+                        inputBar.cancelRequested();
+                    } else if (inputBar.busy) {
+                        // first Esc with a request running: arm the cancellation
+                        inputBar.cancelArmed = true;
+                        disarmTimer.restart();
                     } else {
                         inputBar.closeRequested();
                     }
                 }
 
                 onAccepted: {
+                    inputBar.cancelArmed = false;
+                    disarmTimer.stop();
                     inputBar.sendRequested(text);
                     text = "";
                 }
@@ -132,6 +171,57 @@ Item {
                     font: input.font
                 }
             }
+        }
+
+        // The ■ stop button — cancels immediately, only while a request runs.
+        Rectangle {
+            visible: inputBar.busy
+            Layout.alignment: Qt.AlignVCenter
+            width: 26
+            height: 26
+            radius: 6
+            color: inputBar.inputColor
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+
+            Text {
+                anchors.centerIn: parent
+                text: "\u25A0"
+                font.pixelSize: 11
+                color: stopMouse.containsMouse ? inputBar.textColor : inputBar.dimColor
+            }
+            MouseArea {
+                id: stopMouse
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: inputBar.cancelRequested()
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Chip shown while a cancellation is armed — tells you the next Esc
+    // cancels, and disappears when the request finishes or the timer runs out.
+    // -----------------------------------------------------------------
+
+    Rectangle {
+        visible: inputBar.cancelArmed
+        z: 3
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 60
+        anchors.horizontalCenter: parent.horizontalCenter
+        radius: 8
+        color: inputBar.inputColor
+        border.color: Qt.rgba(1, 1, 1, 0.12)
+        width: chipText.implicitWidth + 20
+        height: chipText.implicitHeight + 12
+
+        Text {
+            id: chipText
+            anchors.centerIn: parent
+            text: "Esc de nuevo para cancelar"
+            font.family: inputBar.fontFamily
+            font.pixelSize: 10
+            color: inputBar.textColor
         }
     }
 

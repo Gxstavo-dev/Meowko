@@ -81,11 +81,29 @@ ShellRoot {
 
     property bool unread: false
 
+    // True while this request is being cancelled (Esc twice, ■ or /cancel).
+    // handleOutput() then marks the partial text as _(cancelado)_ and skips
+    // the sound and the blink.
+    property bool cancelled: false
+
     // Emitted once a full response has been written into the model. The
     // ListView listens for it to scroll your message back to the top, so the
     // answer enters the viewport from below.
 
     signal answered
+
+    // SIGINT first, SIGTERM after 2 s if opencode is still alive. Lives here
+    // (next to `proc`) so cancel() can restart it on every cancellation.
+
+    Timer {
+        id: escalateTimer
+        interval: 2000
+        repeat: false
+        onTriggered: {
+            if (proc.running)
+                proc.signal(15);
+        }
+    }
 
     // ---------------------------------------------------------------------
     // CONFIGURACIÓN — lo único que podés llegar a tocar al instalarlo
@@ -173,6 +191,10 @@ ShellRoot {
             name: "/mute"
             hint: "silencia el aviso"
         }
+        ListElement {
+            name: "/cancel"
+            hint: "cancela la petición"
+        }
     }
 
     // Persists the session ID across restarts. blockLoading makes text()
@@ -255,7 +277,7 @@ ShellRoot {
         const cmd = (parts[0] || "").toLowerCase();
         switch (cmd) {
             case "/help":
-                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/model: muestra el modelo\n/model <modelo>: cambia el modelo\n/models [filtro]: lista los modelos\n/mute: silencia o reactiva el aviso");
+                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/model: muestra el modelo\n/model <modelo>: cambia el modelo\n/models [filtro]: lista los modelos\n/cancel: cancela la petición en curso\n/mute: silencia o reactiva el aviso");
                 break;
             case "/new":
             case "/clear":
@@ -276,6 +298,9 @@ ShellRoot {
             case "/mute":
                 root.muted = !root.muted;
                 root.sys(root.muted ? "aviso silenciado" : "aviso sonoro activado");
+                break;
+            case "/cancel":
+                root.cancel();
                 break;
             default:
                 root.sys("comando desconocido: " + (parts[0] || ""));
@@ -429,13 +454,17 @@ ShellRoot {
         // Fall back to scraping raw output if no text events were found.
         // Then: publish the message, notify listeners, play the sound, and
         // flag the blink — but only if the widget is closed. If the user is
-        // already looking at it, blinking would be noise.
+        // already looking at it, blinking would be noise. A cancelled request
+        // keeps its partial text, gets marked, and stays silent.
 
         if (result !== "") {
-            root.setLast(result);
-            root.answered();
-            root.ding();
-            root.unread = root.activeScreen === "";
+            root.setLast(root.cancelled ? result + "\n\n_(cancelado)_" : result);
+            if (!root.cancelled) {
+                root.answered();
+                root.ding();
+                root.unread = root.activeScreen === "";
+            }
+            root.cancelled = false;
         }
     }
 
@@ -446,6 +475,20 @@ ShellRoot {
             return;
         bell.command = ["pw-play", root.soundFile];
         bell.running = true;
+    }
+
+    // Cancel the running request: SIGINT first (Ctrl+C), SIGTERM after 2 s if
+    // opencode ignores it. The PID is opencode itself — the `exec` in the
+    // sh -c replaced the shell — so the signal reaches it directly.
+    // handleOutput()/onExited() mark the partial text and stay silent.
+
+    function cancel() {
+        if (!proc.running)
+            return;
+        console.log("cancelando petición");
+        root.cancelled = true;
+        proc.signal(2);
+        escalateTimer.restart();
     }
 
     // Dedicated process for the sound, kept separate from `proc` so playing a
@@ -483,6 +526,7 @@ ShellRoot {
         console.log("send llamado con:", t, "running:", proc.running);
         if (proc.running || t.trim() === "")
             return;
+        root.cancelled = false;
 
         chat.append({
             role: "user",
@@ -546,12 +590,18 @@ ShellRoot {
         // there spinning forever. Surface the exit code instead of leaving a
         // silent failure.
 
+        // If opencode died without producing text, the placeholder would sit
+        // there spinning forever. Surface the exit code instead of leaving a
+        // silent failure — or "(cancelado)" when the request was cancelled.
+
         onExited: (code, status) => {
             console.log("opencode terminó, código:", code, "status:", status);
             const i = root.pendingIndex;
-            if (i >= 0 && i < chat.count && chat.get(i).role === "ai" && chat.get(i).text === "")
-                chat.setProperty(i, "text", "(sin respuesta, código " + code + ")");
-            root.pendingIndex = -1;
+            if (i >= 0 && i < chat.count && chat.get(i).role === "ai" && chat.get(i).text === "") {
+                chat.setProperty(i, "text", root.cancelled ? "(cancelado)" : "(sin respuesta, código " + code + ")");
+                root.pendingIndex = -1;
+                root.cancelled = false;
+            }
         }
     }
 
@@ -781,6 +831,7 @@ ShellRoot {
                                 root.send(t);
                         }
                         onCloseRequested: root.activeScreen = ""
+                        onCancelRequested: root.cancel()
                     }
                 }
             }
