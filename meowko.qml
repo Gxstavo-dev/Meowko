@@ -56,6 +56,12 @@ ShellRoot {
     property string model: ""
     property string agent: ""
 
+    // Row of the empty "ai" placeholder awaiting a reply. While opencode
+    // runs, /comandos can append `sys` rows, so "the last row" stops being
+    // the one to fill in; this index keeps setLast() pointed at the right one.
+
+    property int pendingIndex: -1
+
     // When true, ding() is a no-op. Only silences the sound — the blinking
     // alert still runs, since that is a visual cue with a different purpose.
 
@@ -130,6 +136,29 @@ ShellRoot {
         id: chat
     }
 
+    // The /comandos catalogue. Both the popup (name + hint) and runCommand()
+    // dispatch live off this; later tareas add /model, /cancel, /agent, etc.
+
+    ListModel {
+        id: commands
+        ListElement {
+            name: "/help"
+            hint: "lista los comandos"
+        }
+        ListElement {
+            name: "/new"
+            hint: "nueva conversación"
+        }
+        ListElement {
+            name: "/clear"
+            hint: "nueva conversación"
+        }
+        ListElement {
+            name: "/mute"
+            hint: "silencia el aviso"
+        }
+    }
+
     // Persists the session ID across restarts. blockLoading makes text()
     // available synchronously inside Component.onCompleted, so the session is
     // restored before the first prompt instead of racing it.
@@ -183,13 +212,46 @@ ShellRoot {
         return s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split("\n").filter(l => !/^\s*>\s*\S+\s*·/.test(l)).join("\n").trim();
     }
 
-    // Overwrite the last row in the model — i.e. the empty "ai" placeholder
+    // Overwrite the row pointed at by pendingIndex — the empty "ai" placeholder
     // that send() appended — with the finished response.
     function setLast(s) {
-        const i = chat.count - 1;
-        if (i < 0)
+        const i = root.pendingIndex;
+        if (i < 0 || i >= chat.count)
             return;
         chat.setProperty(i, "text", s);
+        root.pendingIndex = -1;
+    }
+
+    // Append a system notice row (output of a /comando). Grey and plain,
+    // never mistaken for a message.
+    function sys(s) {
+        chat.append({
+            role: "sys",
+            text: s
+        });
+    }
+
+    // Dispatch a /comando. The widget resolves these and never sends them to
+    // opencode. New commands (model, agent, session, cancel…) arrive in later
+    // tareas and extend this switch.
+    function runCommand(line) {
+        const parts = line.trim().split(/\s+/);
+        const cmd = (parts[0] || "").toLowerCase();
+        switch (cmd) {
+            case "/help":
+                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/mute: silencia o reactiva el aviso");
+                break;
+            case "/new":
+            case "/clear":
+                root.newChat();
+                break;
+            case "/mute":
+                root.muted = !root.muted;
+                root.sys(root.muted ? "aviso silenciado" : "aviso sonoro activado");
+                break;
+            default:
+                root.sys("comando desconocido: " + (parts[0] || ""));
+        }
     }
 
     // Start over: clear the transcript and the stored session. Refuses while
@@ -302,6 +364,7 @@ ShellRoot {
             role: "ai",
             text: ""
         });   // empty text => render the thinking dots
+        root.pendingIndex = chat.count - 1;
 
         // The command is wrapped in `sh -c` and the arguments are passed as
         // positional params ($0..$4) rather than interpolated into the string.
@@ -357,9 +420,10 @@ ShellRoot {
 
         onExited: (code, status) => {
             console.log("opencode terminó, código:", code, "status:", status);
-            const i = chat.count - 1;
-            if (i >= 0 && chat.get(i).role === "ai" && chat.get(i).text === "")
+            const i = root.pendingIndex;
+            if (i >= 0 && i < chat.count && chat.get(i).role === "ai" && chat.get(i).text === "")
                 chat.setProperty(i, "text", "(sin respuesta, código " + code + ")");
+            root.pendingIndex = -1;
         }
     }
 
@@ -576,15 +640,18 @@ ShellRoot {
                     InputBar {
                         id: inputBar
                         Layout.fillWidth: true
-                        Layout.leftMargin: 14
-                        Layout.rightMargin: 14
-                        Layout.bottomMargin: 14
                         busy: proc.running
+                        commands: root.commands
                         inputColor: root.cInput
                         textColor: root.cText
                         dimColor: root.cDim
                         fontFamily: root.fontFamily
-                        onSendRequested: root.send(text)
+                        onSendRequested: (t) => {
+                            if (t.trim().startsWith("/"))
+                                root.runCommand(t);
+                            else
+                                root.send(t);
+                        }
                         onCloseRequested: root.activeScreen = ""
                     }
                 }

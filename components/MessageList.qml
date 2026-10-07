@@ -31,9 +31,12 @@ ListView {
         width: ListView.view.width
         // Row height depends on the state:
         //   user         -> the bubble's own height
+        //   sys          -> the notice's own height
         //   ai placeholder -> a fixed 14px line for the thinking dots
         //   ai answer    -> text height plus 24px below for the copy button
-        height: model.role === "user" ? userBubble.height : (model.text === "" ? 14 : aiMessage.bodyHeight + 24)
+        height: model.role === "user" ? userBubble.height
+              : model.role === "sys" ? sysText.height + 2
+              : (model.text === "" ? 14 : aiMessage.bodyHeight + 24)
 
         UserBubble {
             id: userBubble
@@ -43,6 +46,14 @@ ListView {
             maxTextWidth: row.width * 0.82
             bubbleColor: list.bubbleColor
             textColor: list.textColor
+            fontFamily: list.fontFamily
+        }
+
+        SysMessage {
+            id: sysText
+            visible: model.role === "sys"
+            text: model.text
+            color: list.dimColor
             fontFamily: list.fontFamily
         }
 

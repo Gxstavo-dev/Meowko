@@ -80,6 +80,8 @@ Los mensajes que empiezan con `/` los resuelve el widget y **no** se envían a o
 
 El modelo y el agente se pasan a opencode con `--model` y `--agent` en cada petición. Las sesiones pertenecen a un directorio, por eso `/cd` abre una conversación nueva.
 
+> Implementados hasta ahora: `/help`, `/new`, `/clear` y `/mute`. El resto de la tabla llega en las próximas tareas (`/model`, `/models`, `/agent`, `/agents`, `/sessions`, `/session`, `/cd`, `/cancel`).
+
 ---
 
 ## Cómo funciona por dentro
@@ -428,13 +430,14 @@ onClicked: {
 
 ### Input, autocompletado y cancelación
 
-`TextInput` dentro de un `Rectangle` de 38 px con `radius: 19`.
+`TextInput` dentro de un `Rectangle` de 38 px con `radius: 19`. El popup de sugerencias (en `components/InputBar.qml`) filtra `root.commands` por lo escrito y solo aparece mientras no haya un espacio en el texto.
 
 - `onAccepted`: si el texto empieza con `/` va a `runCommand()`; si no, a `send()`.
 - `Keys.onTabPressed`: completa la primera sugerencia del popup.
-- `Keys.onEscapePressed`: cierra el popup; si no hay popup y hay una petición en curso, el primer `Esc` arma la cancelación y el segundo la ejecuta; si no hay petición, cierra el widget.
+- `Keys.onEscapePressed`: descarta el popup si está abierto; si no, cierra el widget. (La cancelación con doble `Esc` llega en una tarea próxima.)
+- Clic en una sugerencia la inserta. Los avisos de los comandos se muestran como filas de rol `sys` (texto gris, plano; `components/SysMessage.qml`).
 
-El popup de comandos es un `Rectangle` flotante sobre el input. Calcula sus sugerencias filtrando `root.commands` por lo escrito, y solo aparece mientras no haya un espacio en el texto. El botón ■ junto al input solo es visible mientras `proc.running`.
+El dispatch vive en `runCommand()`; cada comando resuelto es un `case`. Mientras opencode trabaja, `pendingIndex` anota qué fila espera la respuesta, porque una fila `sys` intermedia ya no deja "la última fila" en su lugar.
 
 ---
 
@@ -542,7 +545,7 @@ Pendiente:
 - [x] Reorganizar el código: `assets/` para los GIFs y `components/` para cada componente QML
 - [ ] Mostrar el modelo activo
 - [ ] Cambiar de modelo (`/model`, `/models`)
-- [ ] Comandos con `/` y autocompletado
+- [x] Comandos con `/` y autocompletado
 - [ ] Cancelar una petición (`Esc` dos veces, ■, `/cancel`)
 - [ ] Elegir agente (`/agent`)
 - [ ] Cambiar de sesión (`/sessions`, `/session`)

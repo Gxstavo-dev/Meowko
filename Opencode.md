@@ -61,7 +61,7 @@ Estas tareas parten del código local, el que está en la computadora del usuari
 - [x] **2. Mostrar el modelo activo.**
       El encabezado muestra modelo y agente activos (o "modelo por defecto"). Se guardan en `~/.local/state/meowko-prefs` (JSON) y se leen al arrancar con `try/catch`.
 
-- [ ] **3. Comandos con `/` y autocompletado.**
+- [x] **3. Comandos con `/` y autocompletado.**
       Los mensajes que empiezan con `/` los resuelve el widget y no se envían a opencode. Popup de sugerencias sobre el input; `Tab` completa; clic en una sugerencia la inserta. Comandos mínimos: `/help`, `/new`, `/clear`, `/mute`. Los avisos se muestran como filas de rol `sys` (texto gris, plano).
 
 - [ ] **4. Cambiar de modelo.**
