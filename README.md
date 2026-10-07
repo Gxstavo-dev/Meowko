@@ -80,7 +80,7 @@ Los mensajes que empiezan con `/` los resuelve el widget y **no** se envían a o
 
 El modelo y el agente se pasan a opencode con `--model` y `--agent` en cada petición. Las sesiones pertenecen a un directorio, por eso `/cd` abre una conversación nueva.
 
-> Implementados hasta ahora: `/help`, `/new`, `/clear` y `/mute`. El resto de la tabla llega en las próximas tareas (`/model`, `/models`, `/agent`, `/agents`, `/sessions`, `/session`, `/cd`, `/cancel`).
+> Implementados hasta ahora: `/help`, `/new`, `/clear`, `/mute`, `/model` y `/models`. El resto de la tabla llega en las próximas tareas (`/agent`, `/agents`, `/sessions`, `/session`, `/cd`, `/cancel`).
 
 ---
 
@@ -290,7 +290,8 @@ Meowko/
 │   ├── UserBubble.qml           # burbuja del mensaje del usuario
 │   ├── AiMessage.qml            # respuesta markdown + botón de copiar
 │   ├── ThinkingDots.qml         # los puntitos al "pensar"
-│   └── InputBar.qml             # gato + campo de texto + placeholder
+│   ├── SysMessage.qml           # avisos de /comandos (texto gris, plano)
+│   └── InputBar.qml             # gato + campo de texto + popup de comandos
 └── .gitignore                   # ignora shell.qml (tu copia de trabajo)
 ```
 
@@ -325,16 +326,16 @@ property bool unread: false        // respuesta sin leer
 | Función                         | Qué hace                                                                                       |
 | ------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `clean(s)`                      | Quita códigos ANSI y las líneas de borde del TUI (`> … ·`)                                     |
-| `setLast(s)`                    | Escribe en la fila `pendingIndex` del `ListModel`                                              |
 | `sys(s)`                        | Añade una fila de aviso (salida de un comando)                                                 |
-| `ocCommand(args)`               | Arma la invocación de opencode con `sh -c` y `command -v`                                      |
+| `setLast(s)`                    | Escribe en la fila `pendingIndex` del `ListModel`                                              |
+| `modelsList` / `modelSet`       | Piden el catálogo; `listerMode` guarda si es `/models` o `/model <frag>`                       |
+| `listerGo()`                    | Lanza el `lister` (rechaza si ya corre para no pisar el `Process`)                             |
+| `useList(raw)` -> `buildList()`, `resolveModel()` | `/models` muestra la lista filtrada; `/model` solo cambia si coincide exactamente un modelo |
 | `send(t)`                       | Añade los dos mensajes, arma los flags (`--model`, `--agent`, `--session`) y lanza             |
-| `cancel()`                      | `SIGINT` al proceso; `SIGTERM` a los 2 s si sigue vivo                                         |
 | `runCommand(line)`              | Resuelve un comando `/…`                                                                       |
-| `list(...)` / `handleList(raw)` | Ejecuta `opencode models`, `agent list` o `session list` y muestra el resultado                |
 | `handleOutput(raw)`             | Parsea el JSON, guarda la sesión, acumula el texto y dispara `answered()`, `ding()` y `unread` |
 | `newChat()`                     | Limpia el modelo, la sesión y el archivo (avisa si hay una petición en curso)                  |
-| `savePrefs()`                   | Guarda modelo, agente y directorio                                                             |
+| `savePrefs()`                   | Guarda modelo y agente                                                                         |
 | `ding()`                        | Reproduce el sonido, salvo que esté silenciado                                                 |
 
 ### Los procesos
@@ -543,8 +544,8 @@ no es un problema de este repo: el paquete de Quickshell quedó desactualizado r
 Pendiente:
 
 - [x] Reorganizar el código: `assets/` para los GIFs y `components/` para cada componente QML
-- [ ] Mostrar el modelo activo
-- [ ] Cambiar de modelo (`/model`, `/models`)
+- [x] Mostrar el modelo activo
+- [x] Cambiar de modelo (`/model`, `/models`)
 - [x] Comandos con `/` y autocompletado
 - [ ] Cancelar una petición (`Esc` dos veces, ■, `/cancel`)
 - [ ] Elegir agente (`/agent`)

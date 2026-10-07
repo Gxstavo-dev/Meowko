@@ -49,9 +49,9 @@ ShellRoot {
     property string activeScreen: ""
     property string sessionId: ""
 
-    // Active model / agent, "" = the one opencode picks by default. Only
-    // shown in the header and forwarded with --model / --agent; changing them
-    // comes later (tareas 4 y 6). Persisted in meowko-prefs.
+    // Active model / agent, "" = the one opencode picks by default. Shown in
+    // the header and forwarded with --model / --agent. /model changes the
+    // model; /agent arrives in tarea 6. Persisted in meowko-prefs.
 
     property string model: ""
     property string agent: ""
@@ -61,6 +61,14 @@ ShellRoot {
     // the one to fill in; this index keeps setLast() pointed at the right one.
 
     property int pendingIndex: -1
+
+    // State of the helper `lister` process that answers /models and /model.
+    // listerMode picks what useList() does with the output ("models" prints
+    // it, "model" resolves a fragment); listerFilter is the /models filter or
+    // the /model fragment.
+
+    property string listerMode: ""
+    property string listerFilter: ""
 
     // When true, ding() is a no-op. Only silences the sound — the blinking
     // alert still runs, since that is a visual cue with a different purpose.
@@ -154,6 +162,14 @@ ShellRoot {
             hint: "nueva conversación"
         }
         ListElement {
+            name: "/model"
+            hint: "muestra o cambia el modelo"
+        }
+        ListElement {
+            name: "/models"
+            hint: "lista los modelos"
+        }
+        ListElement {
             name: "/mute"
             hint: "silencia el aviso"
         }
@@ -232,18 +248,30 @@ ShellRoot {
     }
 
     // Dispatch a /comando. The widget resolves these and never sends them to
-    // opencode. New commands (model, agent, session, cancel…) arrive in later
-    // tareas and extend this switch.
+    // opencode. New commands (agent, session, cancel…) arrive in later tareas
+    // and extend this switch.
     function runCommand(line) {
         const parts = line.trim().split(/\s+/);
         const cmd = (parts[0] || "").toLowerCase();
         switch (cmd) {
             case "/help":
-                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/mute: silencia o reactiva el aviso");
+                root.sys("/help: lista los comandos\n/new o /clear: nueva conversación\n/model: muestra el modelo\n/model <modelo>: cambia el modelo\n/models [filtro]: lista los modelos\n/mute: silencia o reactiva el aviso");
                 break;
             case "/new":
             case "/clear":
                 root.newChat();
+                break;
+            case "/model":
+                if (parts[1] === undefined)
+                    root.sys(root.model === "" ? "modelo: por defecto" : "modelo: " + root.model);
+                else if (parts[1] === "default") {
+                    root.model = "";
+                    root.sys("modelo por defecto restaurado");
+                } else
+                    root.modelSet(parts[1]);
+                break;
+            case "/models":
+                root.modelsList(parts[1] || "");
                 break;
             case "/mute":
                 root.muted = !root.muted;
@@ -273,6 +301,86 @@ ShellRoot {
     }
     onModelChanged: root.savePrefs()
     onAgentChanged: root.savePrefs()
+
+    // ---------------------------------------------------------------------
+    // Model list — /models and /model. The helper `lister` process runs
+    // `opencode models` fresh each time so the widget never caches a stale
+    // catalogue; useList() decides what the output becomes.
+    // ---------------------------------------------------------------------
+
+    // /models [filtro]: fetch the list and print a filtered sys row.
+    function modelsList(filtro) {
+        root.listerMode = "models";
+        root.listerFilter = filtro.toLowerCase();
+        root.listerGo();
+    }
+
+    // /model <fragmento>: fetch the list, then resolveModel() applies it.
+    function modelSet(frag) {
+        root.listerMode = "model";
+        root.listerFilter = frag.toLowerCase();
+        root.listerGo();
+    }
+
+    // Fire the lister. Refuses while it is already running instead of
+    // overlapping two `opencode models` calls on one Process.
+    function listerGo() {
+        if (lister.running) {
+            root.sys("ya se está consultando, esperá un momento");
+            return;
+        }
+        lister.command = ["sh", "-c", 'exec "$0" models < /dev/null 2>&1', root.opencodeBin];
+        lister.running = true;
+    }
+
+    function useList(raw) {
+        const mode = root.listerMode;
+        const filter = root.listerFilter;
+        root.listerMode = "";
+        root.listerFilter = "";
+        const lines = root.cleanList(raw);
+
+        if (mode === "model")
+            root.resolveModel(lines, filter);
+        else if (mode === "models")
+            root.sys(root.buildList(lines, filter));
+    }
+
+    // Keep the lines that look like model ids (they all contain a "/"):
+    // opencode occasionally emits banner or warning lines, and a bare model
+    // id is always "provider/name".
+    function cleanList(raw) {
+        return raw.split("\n").map(l => l.trim()).filter(l => l.includes("/"));
+    }
+
+    // /models output: one multiline sys row. With a filter, only the matches;
+    // unfiltered it would bury them under the whole catalogue.
+    function buildList(lines, filter) {
+        const found = filter === "" ? lines : lines.filter(l => l.includes(filter));
+        if (found.length === 0)
+            return filter === "" ? "no hay modelos" : "sin resultados para \"" + filter + "\"";
+        return (filter === "" ? "modelos disponibles:\n" : "modelos con \"" + filter + "\":\n") + found.join("\n");
+    }
+
+    // /model <fragmento>: change only when exactly one entry matches. A full
+    // id wins over fragments; "default" is handled by runCommand directly.
+    function resolveModel(lines, frag) {
+        if (lines.includes(frag)) {
+            root.model = frag;
+            root.sys("modelo: " + frag);
+        } else {
+            const matches = lines.filter(l => l.includes(frag));
+            if (matches.length === 1) {
+                root.model = matches[0];
+                root.sys("modelo: " + matches[0]);
+            } else if (matches.length === 0) {
+                root.sys("no hay ningún modelo que coincida con \"" + frag + "\"");
+            } else {
+                root.sys("varios modelos coinciden:\n" + matches.join("\n")
+                    + "\n\nEscribí /model con un nombre exacto.");
+            }
+        }
+    }
 
     // ---------------------------------------------------------------------
     // opencode bridge
@@ -345,6 +453,26 @@ ShellRoot {
 
     Process {
         id: bell
+    }
+
+    // Answers /models and /model with a fresh `opencode models` catalogue.
+    // Runs in parallel with `proc`; useList() dispatches its output. stdout
+    // is folded into stderr so stray logs can't corrupt the id lines.
+
+    Process {
+        id: lister
+        workingDirectory: homePath
+        environment: ({
+                NO_COLOR: "1",
+                TERM: "dumb"
+            })
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                console.log("LISTA:", text);
+                root.useList(text);
+            }
+        }
     }
 
     // Append both messages optimistically, then launch opencode.

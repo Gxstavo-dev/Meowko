@@ -64,8 +64,8 @@ Estas tareas parten del código local, el que está en la computadora del usuari
 - [x] **3. Comandos con `/` y autocompletado.**
       Los mensajes que empiezan con `/` los resuelve el widget y no se envían a opencode. Popup de sugerencias sobre el input; `Tab` completa; clic en una sugerencia la inserta. Comandos mínimos: `/help`, `/new`, `/clear`, `/mute`. Los avisos se muestran como filas de rol `sys` (texto gris, plano).
 
-- [ ] **4. Cambiar de modelo.**
-      `/model` muestra el activo, `/model <proveedor/modelo>` lo cambia (acepta un fragmento si solo coincide uno), `/model default` lo quita. `/models [filtro]` lista los disponibles con `opencode models`. El modelo se pasa con `--model` en cada petición.
+- [x] **4. Cambiar de modelo.**
+      `/model` muestra el activo, `/model <proveedor/modelo>` lo cambia (acepta un fragmento si solo coincide uno), `/model default` lo quita. `/models [filtro]` lista los disponibles con `opencode models`. El modelo se pasa con `--model` en cada petición. El catálogo lo trae el `Process` `lister`, fresco en cada consulta.
 
 - [ ] **5. Cancelar una petición.**
       Se cancela pulsando **`Esc` dos veces** seguidas (no `Ctrl+C`):
