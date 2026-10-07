@@ -63,7 +63,7 @@ Item {
 
     function updateSuggestions() {
         const t = input.text.trim();
-        if (!t.startsWith("/") || t.includes(" ") || inputBar.commands === null || inputBar.commands.count === 0) {
+        if (!t.startsWith("/") || t.includes(" ") || !inputBar.commands || typeof inputBar.commands.count === "undefined" || inputBar.commands.count === 0) {
             inputBar.suggestions = [];
             return;
         }

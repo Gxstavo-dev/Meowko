@@ -131,7 +131,7 @@ ShellRoot {
 
     readonly property string homePath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "")
 
-    readonly property string opencodeBin: homePath + "/.cache/.bun/bin/opencode"
+    readonly property string opencodeBin: homePath + "/.cache/.bun/install/global/node_modules/opencode-ai/bin/opencode.exe"
 
     // ---------------------------------------------------------------------
     // Geometry
