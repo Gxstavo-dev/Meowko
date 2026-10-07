@@ -75,6 +75,10 @@ ShellRoot {
     property string agentListerMode: ""
     property string agentListerFilter: ""
 
+    // Working directory for opencode runs. Defaults to the user's home and
+    // can be changed with /cd (which starts a new conversation).
+    property string workDir: homePath
+
     // When true, ding() is a no-op. Only silences the sound — the blinking
     // alert still runs, since that is a visual cue with a different purpose.
 
@@ -605,7 +609,7 @@ ShellRoot {
 
     Process {
         id: proc
-        workingDirectory: homePath
+        workingDirectory: root.workDir
         // NO_COLOR / TERM=dumb keep opencode from emitting terminal escapes
         // into a stream we are about to JSON.parse line by line.
 
